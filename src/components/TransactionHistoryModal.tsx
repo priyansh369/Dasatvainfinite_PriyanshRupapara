@@ -576,12 +576,28 @@ export default function TransactionHistoryModal({
                       >
                         <span style={{ fontSize: "14px" }}>{tx.destChain?.icon || "🟣"}</span>
                         <span style={{ fontSize: "13px", fontWeight: "700", color: "#c084fc" }}>
-                          {tx.amount} wDEMO
+                          {tx.receiveAmount || tx.amount} {tx.receiveToken || "wDEMO"}
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                           ({tx.destChain?.name || "Polygon Amoy"})
                         </span>
                       </div>
+
+                      {tx.exchangeRate && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            borderRadius: "6px",
+                            background: "rgba(216, 97, 60, 0.15)",
+                            color: "var(--terracotta-300)",
+                            border: "1px solid rgba(216, 97, 60, 0.25)",
+                            fontWeight: "600",
+                          }}
+                        >
+                          Rate: {tx.exchangeRate}
+                        </span>
+                      )}
                     </div>
 
                     {/* Status & Timestamp */}

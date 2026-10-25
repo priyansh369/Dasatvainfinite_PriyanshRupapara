@@ -24,6 +24,8 @@ import {
   RefreshCw,
   Sparkles,
   History,
+  ArrowUpDown,
+  TrendingUp,
 } from "lucide-react";
 
 import {
@@ -52,6 +54,24 @@ import {
   saveTransaction,
   updateTransaction,
 } from "./types/history";
+
+// ── Multi-Currency Crypto Exchange Model (e.g. 1 USD = 94.95 INR) ───────────
+export interface SupportedCurrency {
+  code: string;
+  name: string;
+  symbol: string;
+  icon: string;
+  usdRate: number; // USD value per 1 unit of this currency
+}
+
+export const SUPPORTED_CURRENCIES: Record<string, SupportedCurrency> = {
+  USD: { code: "USD", name: "US Dollar", symbol: "$", icon: "💵", usdRate: 1.0 },
+  INR: { code: "INR", name: "Indian Rupee", symbol: "₹", icon: "🇮🇳", usdRate: 1 / 94.95 },
+  USDT: { code: "USDT", name: "Tether USD", symbol: "USDT", icon: "🟢", usdRate: 1.0 },
+  ETH: { code: "ETH", name: "Ethereum", symbol: "ETH", icon: "🔷", usdRate: 2650.0 },
+  POL: { code: "POL", name: "Polygon", symbol: "POL", icon: "🟣", usdRate: 0.36 },
+  wDEMO: { code: "wDEMO", name: "Wrapped Demo", symbol: "wDEMO", icon: "🪙", usdRate: 1.0 },
+};
 
 // Global window ethereum typing
 declare global {
@@ -101,6 +121,69 @@ export default function App() {
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
+
+  // ── Currency Exchange Engine State (e.g. 1 USD = 94.95 INR) ─────────────
+  const [sendCurrency, setSendCurrency] = useState<string>("USD");
+  const [receiveCurrency, setReceiveCurrency] = useState<string>("INR");
+  const [exchangeAmount, setExchangeAmount] = useState<string>("1");
+
+  // Calculate live conversion
+  const calculateReceiveAmount = (
+    amountStr: string,
+    fromCode: string,
+    toCode: string
+  ): string => {
+    const val = parseFloat(amountStr);
+    if (isNaN(val) || val <= 0) return "0.00";
+    const fromRate = SUPPORTED_CURRENCIES[fromCode]?.usdRate || 1.0;
+    const toRate = SUPPORTED_CURRENCIES[toCode]?.usdRate || 1.0;
+    const converted = (val * fromRate) / toRate;
+    if (converted >= 100) return converted.toFixed(2);
+    if (converted >= 1) return converted.toFixed(2);
+    return converted.toFixed(4);
+  };
+
+  const receiveAmount = calculateReceiveAmount(exchangeAmount, sendCurrency, receiveCurrency);
+
+  const exchangeRateString = useMemo(() => {
+    const fromRate = SUPPORTED_CURRENCIES[sendCurrency]?.usdRate || 1.0;
+    const toRate = SUPPORTED_CURRENCIES[receiveCurrency]?.usdRate || 1.0;
+    const rate = fromRate / toRate;
+    if (rate >= 1) {
+      return `1 ${sendCurrency} = ${rate.toFixed(2)} ${receiveCurrency}`;
+    } else {
+      return `1 ${sendCurrency} = ${rate.toFixed(4)} ${receiveCurrency}`;
+    }
+  }, [sendCurrency, receiveCurrency]);
+
+  const handleInvertCurrencies = () => {
+    const oldSend = sendCurrency;
+    const oldRecv = receiveCurrency;
+    setSendCurrency(oldRecv);
+    setReceiveCurrency(oldSend);
+    setExchangeAmount(receiveAmount || "1");
+  };
+
+  // ── Unread History Notifications (Clears when user views logs) ───────────
+  const [lastSeenTxCount, setLastSeenTxCount] = useState<number>(() => {
+    try {
+      return parseInt(localStorage.getItem("cryptoxchange_last_seen_tx_count") || "0", 10);
+    } catch {
+      return 0;
+    }
+  });
+
+  const unreadCount = Math.max(0, transactions.length - lastSeenTxCount);
+
+  const openHistoryModal = () => {
+    setShowHistory(true);
+    setLastSeenTxCount(transactions.length);
+    try {
+      localStorage.setItem("cryptoxchange_last_seen_tx_count", transactions.length.toString());
+    } catch {
+      // ignore
+    }
+  };
 
   // Custom contract overrides
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
@@ -229,14 +312,20 @@ export default function App() {
   };
 
   const handleMax = () => {
-    if (selectedToken === chainInfo.symbol) {
-      const maxVal = Math.max(0, parseFloat(connectedNativeBalance) - 0.002);
-      setAmountEth(maxVal > 0 ? maxVal.toFixed(4) : connectedNativeBalance);
-    } else if (selectedToken === "ETH") {
+    if (sendCurrency === "ETH") {
       const maxVal = Math.max(0, parseFloat(nativeBalance) - 0.002);
-      setAmountEth(maxVal > 0 ? maxVal.toFixed(4) : nativeBalance);
+      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : nativeBalance);
+    } else if (sendCurrency === "POL") {
+      const maxVal = Math.max(0, parseFloat(connectedNativeBalance) - 0.002);
+      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : connectedNativeBalance);
+    } else if (sendCurrency === "wDEMO") {
+      setExchangeAmount(wDemoTokenBalance);
+    } else if (sendCurrency === "USD") {
+      setExchangeAmount("100");
+    } else if (sendCurrency === "INR") {
+      setExchangeAmount("9495");
     } else {
-      setAmountEth(wDemoTokenBalance);
+      setExchangeAmount("10");
     }
   };
 
@@ -370,25 +459,33 @@ export default function App() {
     setIsBusy(true);
     setErrorMessage("");
 
+    // Calculate effective ETH deposit for smart contract
+    const effectiveEth = sendCurrency === "ETH"
+      ? exchangeAmount
+      : (Math.max(0.0001, parseFloat(exchangeAmount) / 2650)).toFixed(6);
+
     // 🎮 Demo Simulation Mode (Zero gas & instant execution)
     if (isDemoMode) {
       startStopwatch();
       try {
-        const demo = buildDemoProof(account, recipient || account, amountEth);
+        const demo = buildDemoProof(account, recipient || account, effectiveEth);
         const txId = `demo-${Date.now()}`;
         setActiveTxId(txId);
         setSubmitResult(demo.submitResult);
         setProofResult({ proof: demo.proof, header: demo.header, request: demo.request });
         setCurrentConfirmations(1);
 
-        // Record in transaction history
+        // Record in transaction history with currency exchange values
         const newTx: BridgeTransaction = {
           id: txId,
           timestamp: Date.now(),
           status: "locked",
           isDemo: true,
-          amount: amountEth,
-          token: selectedToken,
+          amount: exchangeAmount,
+          token: sendCurrency,
+          receiveAmount: receiveAmount,
+          receiveToken: receiveCurrency,
+          exchangeRate: exchangeRateString,
           recipient: recipient || account,
           sender: account,
           sourceChain: {
@@ -464,7 +561,7 @@ export default function App() {
       };
 
       // 1. Submit Request
-      const sub = await submitRequest(config, recipient, amountEth);
+      const sub = await submitRequest(config, recipient, effectiveEth);
       setSubmitResult(sub);
       setCurrentConfirmations(1);
 
@@ -475,14 +572,17 @@ export default function App() {
       const txId = sub.id.toString();
       setActiveTxId(txId);
 
-      // Record in transaction history
+      // Record in transaction history with currency exchange values
       const newTx: BridgeTransaction = {
         id: txId,
         timestamp: Date.now(),
         status: "locked",
         isDemo: false,
-        amount: amountEth,
-        token: selectedToken,
+        amount: exchangeAmount,
+        token: sendCurrency,
+        receiveAmount: receiveAmount,
+        receiveToken: receiveCurrency,
+        exchangeRate: exchangeRateString,
         recipient,
         sender: account,
         sourceChain: {
@@ -547,7 +647,7 @@ export default function App() {
           .map((b) => b.toString(16).padStart(2, "0"))
           .join("");
         setVerifyTxHash(fakeAmoyTx);
-        setWDemoBalance(amountEth);
+        setWDemoBalance(`${receiveAmount} ${receiveCurrency}`);
         stopStopwatch();
 
         const elapsed = startTimeRef.current ? Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1)) : 1.4;
@@ -556,6 +656,9 @@ export default function App() {
             status: "minted",
             destTxHash: fakeAmoyTx,
             elapsedSec: elapsed,
+            receiveAmount: receiveAmount,
+            receiveToken: receiveCurrency,
+            exchangeRate: exchangeRateString,
           });
           setTransactions(updated);
         }
@@ -622,6 +725,9 @@ export default function App() {
           status: "minted",
           destTxHash: receipt.hash,
           elapsedSec: elapsed,
+          receiveAmount: receiveAmount,
+          receiveToken: receiveCurrency,
+          exchangeRate: exchangeRateString,
         });
         setTransactions(updated);
       }
@@ -631,9 +737,9 @@ export default function App() {
         const wDemo = new ethers.Contract(wrappedDemoAddress, WRAPPED_DEMO_ABI, browserProvider);
         const bal: bigint = await wDemo.balanceOf(recipient);
         const dec: bigint = await wDemo.decimals();
-        setWDemoBalance(ethers.formatUnits(bal, dec));
+        setWDemoBalance(`${ethers.formatUnits(bal, dec)} ${receiveCurrency}`);
       } catch {
-        setWDemoBalance(amountEth);
+        setWDemoBalance(`${receiveAmount} ${receiveCurrency}`);
       }
 
       setPhase("SUCCESS");
@@ -794,11 +900,11 @@ export default function App() {
           <button
             className="btn btn-secondary"
             style={{ padding: "8px 12px", position: "relative" }}
-            onClick={() => setShowHistory(true)}
+            onClick={openHistoryModal}
             title="Transaction History & Cryptographic Proof Explorer"
           >
             <History size={18} />
-            {transactions.length > 0 && (
+            {unreadCount > 0 && (
               <span
                 style={{
                   position: "absolute",
@@ -818,7 +924,7 @@ export default function App() {
                   boxShadow: "0 0 8px rgba(216, 97, 60, 0.6)",
                 }}
               >
-                {transactions.length}
+                {unreadCount}
               </span>
             )}
           </button>
@@ -1200,49 +1306,238 @@ export default function App() {
               </div>
             )}
 
-            {/* Token Selector & Asset Balance Selection */}
-            <div style={{ marginBottom: "20px" }}>
-              <label className="input-label">Select Asset to Lock & Bridge</label>
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                {/* Active Connected Token Chip */}
-                {chainInfo.symbol !== "ETH" && (
-                  <div
-                    className={`token-chip ${selectedToken === chainInfo.symbol ? "active" : ""}`}
-                    onClick={() => setSelectedToken(chainInfo.symbol)}
-                  >
-                    <span>{chainInfo.icon}</span>
-                    <span className="token-chip-symbol">{chainInfo.symbol} ({chainInfo.name})</span>
-                    <span className="token-chip-balance">{connectedNativeBalance} {chainInfo.symbol}</span>
+            {/* ── Crypto & Currency Exchange Engine (e.g. 1 USD = 94.95 INR) ── */}
+            <div style={{ marginBottom: "24px" }}>
+              {/* Send Box */}
+              <div
+                style={{
+                  background: "rgba(0, 0, 0, 0.35)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "14px",
+                  padding: "18px 20px",
+                  marginBottom: "8px",
+                  position: "relative",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
+                      You Pay / Send
+                    </span>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                      (Source: {chainInfo.name})
+                    </span>
                   </div>
-                )}
 
-                <div
-                  className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
-                  onClick={() => setSelectedToken("ETH")}
-                >
-                  <span>🔷</span>
-                  <span className="token-chip-symbol">ETH (Sepolia Native)</span>
-                  <span className="token-chip-balance">{nativeBalance} ETH</span>
+                  {/* Preset Buttons */}
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {["1", "10", "100", "1000"].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setExchangeAmount(preset)}
+                        style={{
+                          background: exchangeAmount === preset ? "rgba(216, 97, 60, 0.3)" : "rgba(255, 255, 255, 0.05)",
+                          border: "1px solid",
+                          borderColor: exchangeAmount === preset ? "var(--terracotta-400)" : "rgba(255, 255, 255, 0.1)",
+                          color: exchangeAmount === preset ? "#fff" : "var(--text-muted)",
+                          padding: "3px 8px",
+                          borderRadius: "6px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {SUPPORTED_CURRENCIES[sendCurrency]?.symbol}{preset}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleMax}
+                      style={{
+                        background: "rgba(216, 97, 60, 0.2)",
+                        border: "1px solid var(--terracotta-500)",
+                        color: "var(--terracotta-300)",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                      }}
+                    >
+                      MAX
+                    </button>
+                  </div>
                 </div>
 
-                <div
-                  className={`token-chip ${selectedToken === "wDEMO" ? "active" : ""}`}
-                  onClick={() => setSelectedToken("wDEMO")}
-                >
-                  <span>🟣</span>
-                  <span className="token-chip-symbol">wDEMO (Polygon Amoy)</span>
-                  <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={exchangeAmount}
+                      onChange={(e) => setExchangeAmount(e.target.value)}
+                      placeholder="0.00"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        fontSize: "30px",
+                        fontWeight: "800",
+                        color: "#f8fafc",
+                        fontFamily: "var(--font-mono)",
+                        width: "100%",
+                      }}
+                    />
+                  </div>
 
+                  {/* Send Currency Selector Chips */}
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {Object.values(SUPPORTED_CURRENCIES).map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setSendCurrency(c.code)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          padding: "6px 10px",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          border: "1px solid",
+                          borderColor: sendCurrency === c.code ? "var(--terracotta-400)" : "rgba(255, 255, 255, 0.1)",
+                          background: sendCurrency === c.code ? "rgba(216, 97, 60, 0.25)" : "rgba(255, 255, 255, 0.04)",
+                          color: sendCurrency === c.code ? "#fff" : "var(--text-secondary)",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <span>{c.icon}</span>
+                        <span>{c.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Swap Invert Button */}
+              <div style={{ display: "flex", justifyContent: "center", margin: "-16px 0", position: "relative", zIndex: 2 }}>
                 <button
                   type="button"
-                  className="btn-import-token"
-                  onClick={importWDEMOToMetaMask}
-                  title="Add wDEMO token into your MetaMask wallet"
+                  onClick={handleInvertCurrencies}
+                  title="Invert swap direction"
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #d8613c, #b0749f)",
+                    border: "3px solid #160b1c",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(216, 97, 60, 0.4)",
+                    transition: "transform 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "rotate(180deg)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "rotate(0deg)")}
                 >
-                  {tokenImported ? <Check size={12} color="#34d399" /> : <Plus size={12} />}
-                  {tokenImported ? "Added to MetaMask!" : "Add wDEMO to MetaMask"}
+                  <ArrowUpDown size={16} />
                 </button>
+              </div>
+
+              {/* Receive Box */}
+              <div
+                style={{
+                  background: "rgba(0, 0, 0, 0.35)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "14px",
+                  padding: "18px 20px",
+                  marginTop: "8px",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
+                    You Receive (Calculated Payout)
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#34d399", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <TrendingUp size={12} /> Guaranteed Rate
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      fontSize: "30px",
+                      fontWeight: "800",
+                      color: "#34d399",
+                      fontFamily: "var(--font-mono)",
+                      letterSpacing: "-0.5px",
+                    }}
+                  >
+                    {receiveAmount} {SUPPORTED_CURRENCIES[receiveCurrency]?.symbol}
+                  </div>
+
+                  {/* Receive Currency Selector Chips */}
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {Object.values(SUPPORTED_CURRENCIES).map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setReceiveCurrency(c.code)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          padding: "6px 10px",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          border: "1px solid",
+                          borderColor: receiveCurrency === c.code ? "#10b981" : "rgba(255, 255, 255, 0.1)",
+                          background: receiveCurrency === c.code ? "rgba(16, 185, 129, 0.25)" : "rgba(255, 255, 255, 0.04)",
+                          color: receiveCurrency === c.code ? "#fff" : "var(--text-secondary)",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <span>{c.icon}</span>
+                        <span>{c.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Rate & Fee Summary Pill */}
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "10px 16px",
+                  borderRadius: "10px",
+                  background: "rgba(176, 116, 159, 0.08)",
+                  border: "1px solid rgba(176, 116, 159, 0.2)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  fontSize: "12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ color: "var(--terracotta-400)", fontWeight: "700" }}>⚡ Guaranteed Rate:</span>
+                  <span className="mono" style={{ color: "#f8fafc", fontWeight: "700" }}>
+                    {exchangeRateString}
+                  </span>
+                </div>
+                <div style={{ color: "var(--text-muted)" }}>
+                  Slippage: 0.0% · Zero Relayer Fee · Polygon Amoy
+                </div>
               </div>
             </div>
 
@@ -1255,29 +1550,6 @@ export default function App() {
                   onChange={(e) => setRecipient(e.target.value)}
                   placeholder="0x..."
                 />
-              </div>
-
-              <div className="input-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label className="input-label" style={{ marginBottom: 0 }}>
-                    Lock Value ({selectedToken})
-                  </label>
-                  <span style={{ fontSize: "12px", color: "var(--mauve-300)" }}>
-                    Available: <span className="mono" style={{ color: "var(--terracotta-300)" }}>{selectedToken === "ETH" ? nativeBalance : wDemoTokenBalance} {selectedToken}</span>
-                  </span>
-                </div>
-                <div className="input-wrapper">
-                  <input
-                    type="number"
-                    step="0.0001"
-                    className="input-field mono"
-                    value={amountEth}
-                    onChange={(e) => setAmountEth(e.target.value)}
-                  />
-                  <button type="button" className="btn-max" onClick={handleMax}>
-                    MAX
-                  </button>
-                </div>
               </div>
 
               <div className="input-group">
@@ -1297,10 +1569,11 @@ export default function App() {
               <button
                 className="btn btn-primary"
                 onClick={handleLockEth}
-                disabled={isBusy || !recipient || !amountEth}
+                disabled={isBusy || !recipient || !exchangeAmount || parseFloat(exchangeAmount) <= 0}
+                style={{ padding: "12px 24px", fontSize: "14px", fontWeight: "700" }}
               >
                 <Lock size={16} />
-                {isBusy ? "Initiating on Sepolia..." : "Lock ETH & Generate Proof"}
+                {isBusy ? "Initiating Cross-Chain..." : `Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency}`}
               </button>
             </div>
           </div>
@@ -1427,13 +1700,25 @@ export default function App() {
 
             <div className="proof-box" style={{ maxWidth: "640px", margin: "0 auto 28px auto", textAlign: "left" }}>
               <div className="proof-item">
+                <span className="proof-label">Currency Exchange:</span>
+                <span className="proof-val" style={{ color: "#f8fafc", fontWeight: "bold" }}>
+                  {exchangeAmount} {sendCurrency} ➔ {receiveAmount} {receiveCurrency}
+                </span>
+              </div>
+              <div className="proof-item">
+                <span className="proof-label">Guaranteed Rate:</span>
+                <span className="proof-val" style={{ color: "var(--terracotta-400)", fontWeight: "bold" }}>
+                  {exchangeRateString}
+                </span>
+              </div>
+              <div className="proof-item">
                 <span className="proof-label">Minted to Recipient:</span>
                 <span className="proof-val">{recipient}</span>
               </div>
               <div className="proof-item">
-                <span className="proof-label">Amount Minted:</span>
+                <span className="proof-label">Payout Received:</span>
                 <span className="proof-val" style={{ color: "#34d399", fontWeight: "bold" }}>
-                  {wDemoBalance || amountEth} wDEMO
+                  {receiveAmount} {receiveCurrency}
                 </span>
               </div>
               {verifyTxHash && (
@@ -1476,7 +1761,7 @@ export default function App() {
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => setShowHistory(true)}
+                onClick={openHistoryModal}
                 style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
                 <History size={16} /> View in Proof Explorer
@@ -1546,7 +1831,15 @@ export default function App() {
           isOpen={showHistory}
           onClose={() => setShowHistory(false)}
           transactions={transactions}
-          onTransactionsChange={setTransactions}
+          onTransactionsChange={(updated) => {
+            setTransactions(updated);
+            setLastSeenTxCount(updated.length);
+            try {
+              localStorage.setItem("cryptoxchange_last_seen_tx_count", updated.length.toString());
+            } catch {
+              // ignore
+            }
+          }}
           onTriggerDemo={() => {
             setIsDemoMode(true);
             resetFlow();

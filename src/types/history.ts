@@ -20,6 +20,9 @@ export interface BridgeTransaction {
   isDemo: boolean;
   amount: string;
   token: string;
+  receiveAmount?: string;
+  receiveToken?: string;
+  exchangeRate?: string;
   sender?: string;
   recipient: string;
   sourceChain: ChainMetadata;
@@ -127,6 +130,9 @@ export function exportProofToJson(tx: BridgeTransaction): void {
       isDemo: tx.isDemo,
       amount: tx.amount,
       token: tx.token,
+      receiveAmount: tx.receiveAmount || tx.amount,
+      receiveToken: tx.receiveToken || "wDEMO",
+      exchangeRate: tx.exchangeRate || "1:1",
       sender: tx.sender || "N/A",
       recipient: tx.recipient,
       sourceChain: tx.sourceChain,
