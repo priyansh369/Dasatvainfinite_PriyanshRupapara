@@ -86,8 +86,6 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
-  const [showMerkleVisualizerModal, setShowMerkleVisualizerModal] = useState<boolean>(false);
-  const [proofTab, setProofTab] = useState<"visualizer" | "raw">("visualizer");
 
   // Custom contract overrides
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
@@ -348,18 +346,14 @@ export default function App() {
       try {
         const demo = buildDemoProof(account, recipient || account, amountEth);
         setSubmitResult(demo.submitResult);
-        setPhase("PHASE1_CONFIRMING");
-
-        // Simulate 3 block confirmations with live visual feedback
-        setCurrentConfirmations(1);
-        await new Promise((r) => setTimeout(r, 700));
-        setCurrentConfirmations(2);
-        await new Promise((r) => setTimeout(r, 700));
-        setCurrentConfirmations(3);
-        await new Promise((r) => setTimeout(r, 500));
-
         setProofResult({ proof: demo.proof, header: demo.header, request: demo.request });
+        setCurrentConfirmations(1);
+        // Immediately show the live step-by-step Merkle Tree Visualizer!
         setPhase("PHASE1_PROOF");
+
+        // Simulate block confirmations advancing in parallel
+        setTimeout(() => setCurrentConfirmations(2), 1200);
+        setTimeout(() => setCurrentConfirmations(3), 2400);
       } catch (err: unknown) {
         setErrorMessage(err instanceof Error ? err.message : String(err));
         stopStopwatch();
@@ -406,23 +400,25 @@ export default function App() {
       // 1. Submit Request
       const sub = await submitRequest(config, recipient, amountEth);
       setSubmitResult(sub);
-      setPhase("PHASE1_CONFIRMING");
-
-      // 2. Wait for confirmations
       setCurrentConfirmations(1);
-      await waitForConfirmations(
-        browserProvider,
-        sub.txHash,
-        targetConfirmations,
-        (current) => setCurrentConfirmations(current),
-        undefined,
-        1500
-      );
 
-      // 3. Build proof off-chain using bounded block window
-      setPhase("PHASE1_PROOF");
+      // 2. Build proof off-chain using bounded block window
       const proof = await buildProof(config, sub.id, sub.blockNumber);
       setProofResult(proof);
+      // Immediately display live Merkle Tree step-by-step calculation!
+      setPhase("PHASE1_PROOF");
+
+      // 3. Continue polling confirmations in background if needed
+      if (targetConfirmations > 1) {
+        waitForConfirmations(
+          browserProvider,
+          sub.txHash,
+          targetConfirmations,
+          (current) => setCurrentConfirmations(current),
+          undefined,
+          1500
+        ).catch(console.warn);
+      }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
       stopStopwatch();
@@ -649,17 +645,6 @@ export default function App() {
               {isConnecting ? "Connecting..." : "Connect MetaMask"}
             </button>
           )}
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ padding: "8px 12px", gap: "6px" }}
-            onClick={() => setShowMerkleVisualizerModal(true)}
-            title="Open Interactive Merkle Tree Visualizer"
-          >
-            <span style={{ fontSize: "14px" }}>🌳</span>
-            <span style={{ fontSize: "12px", fontWeight: "600" }}>Tree Visualizer</span>
-          </button>
 
           <button
             className="btn btn-secondary"
@@ -1080,30 +1065,44 @@ export default function App() {
           </div>
         )}
 
-        {/* State 2: Live Confirmation Counter */}
-        {phase === "PHASE1_CONFIRMING" && submitResult && (
-          <div style={{ padding: "20px 0" }}>
-            <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <div className="brand-icon animate-pulse-glow" style={{ width: "56px", height: "56px", margin: "0 auto 16px auto" }}>
-                <Clock size={28} />
-              </div>
-              <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "8px" }}>
-                Awaiting Block Confirmations
-              </h2>
-              <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-                Transaction included in Block #{submitResult.blockNumber}. Polling for finalized blocks...
-              </p>
-            </div>
+        {/* State 3: Direct Live Merkle Tree Visualizer & Phase 2 Actions */}
+        {(phase === "PHASE1_CONFIRMING" || phase === "PHASE1_PROOF" || phase === "PHASE2_SWITCH") && proofResult && submitResult && (
+          <div>
+            {/* Live Block Confirmation Banner */}
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 20px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div className="brand-icon animate-pulse-glow" style={{ width: "36px", height: "36px", fontSize: "16px" }}>
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
+                      Sepolia Block #{submitResult.blockNumber} Finality
+                    </div>
+                    <div className="mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      Tx:{" "}
+                      <a
+                        href={`${NETWORKS.sepolia.blockExplorerUrl}/tx/${submitResult.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="explorer-link"
+                      >
+                        {submitResult.txHash.slice(0, 14)}...{submitResult.txHash.slice(-8)}
+                        <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Confirmation Progress */}
-            <div style={{ maxWidth: "480px", margin: "0 auto 28px auto", textAlign: "center" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontWeight: "700", fontSize: "14px" }}>
-                <span>Confirmations</span>
-                <span className="mono" style={{ color: "var(--terracotta-400)" }}>
-                  {currentConfirmations} / {targetConfirmations}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <span className="mono" style={{ fontSize: "13px", fontWeight: "700", color: "var(--terracotta-400)" }}>
+                    {currentConfirmations} / {targetConfirmations} Confirmations
+                  </span>
+                  <span className="badge badge-success">✓ On-Chain Lock</span>
+                </div>
               </div>
-              <div className="progress-bar-bg">
+
+              <div className="progress-bar-bg" style={{ height: "6px" }}>
                 <div
                   className="progress-bar-fill"
                   style={{ width: `${Math.min(100, (currentConfirmations / targetConfirmations) * 100)}%` }}
@@ -1111,146 +1110,19 @@ export default function App() {
               </div>
             </div>
 
-            <div className="proof-box" style={{ maxWidth: "600px", margin: "0 auto" }}>
-              <div className="proof-item">
-                <span className="proof-label">Sepolia Tx Hash:</span>
-                <a
-                  href={`${NETWORKS.sepolia.blockExplorerUrl}/tx/${submitResult.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="explorer-link"
-                >
-                  {submitResult.txHash.slice(0, 16)}...{submitResult.txHash.slice(-10)}
-                  <ExternalLink size={12} />
-                </a>
-              </div>
-              <div className="proof-item">
-                <span className="proof-label">Request ID:</span>
-                <span className="proof-val">{submitResult.id.toString()}</span>
-              </div>
-              <div className="proof-item">
-                <span className="proof-label">Leaf Hash:</span>
-                <span className="proof-val">{submitResult.leaf}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* State 3: Proof Viewer & Switch to Polygon Amoy */}
-        {(phase === "PHASE1_PROOF" || phase === "PHASE2_SWITCH") && proofResult && submitResult && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-              <div>
-                <h2 style={{ fontSize: "20px", fontWeight: "800", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <ShieldCheck size={22} style={{ color: "#34d399" }} />
-                  Inclusion Proof Generated Off-Chain
-                </h2>
-                <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                  Reconstructed depth-8 Merkle tree matches Router.root(). Ready to verify on Polygon Amoy.
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <span className="badge badge-success">✓ Tree Validated</span>
-                <span className="badge badge-amoy">Target: Amoy (N2)</span>
-              </div>
-            </div>
-
-            {/* Tab Selector: Interactive Tree Visualizer vs Raw Payload */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-              <button
-                type="button"
-                className={`btn ${proofTab === "visualizer" ? "btn-primary" : "btn-secondary"}`}
-                style={{ padding: "6px 14px", fontSize: "12px", gap: "6px" }}
-                onClick={() => setProofTab("visualizer")}
-              >
-                <span>🌳</span>
-                <span>Interactive Tree Visualizer</span>
-              </button>
-              <button
-                type="button"
-                className={`btn ${proofTab === "raw" ? "btn-primary" : "btn-secondary"}`}
-                style={{ padding: "6px 14px", fontSize: "12px", gap: "6px" }}
-                onClick={() => setProofTab("raw")}
-              >
-                <Layers size={14} />
-                <span>Raw Cryptographic Payload</span>
-              </button>
-            </div>
-
-            {/* Tab 1: Interactive Tree Visualizer */}
-            {proofTab === "visualizer" && (
+            {/* Direct Step-by-Step Merkle Tree Visualizer Hero */}
+            <div style={{ marginBottom: "20px" }}>
               <MerkleTreeVisualizer
                 root={proofResult.header.root}
                 leaf={submitResult.leaf}
                 proof={proofResult.proof}
                 requestId={submitResult.id}
                 isInline={true}
+                autoAnimate={true}
               />
-            )}
+            </div>
 
-            {/* Tab 2: Raw Cryptographic Proof Card */}
-            {proofTab === "raw" && (
-              <div className="proof-box">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "10px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Layers size={16} /> Merkle Verification Payload
-                  </span>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: "11px" }}
-                    onClick={() => setShowProofDetails(!showProofDetails)}
-                  >
-                    {showProofDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    {showProofDetails ? "Collapse Sibling Nodes" : "View 8 Sibling Nodes"}
-                  </button>
-                </div>
-
-                <div className="proof-item">
-                  <span className="proof-label">Merkle Root (Header):</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="proof-val">{proofResult.header.root}</span>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ padding: "2px 6px" }}
-                      onClick={() => copyToClipboard(proofResult.header.root, "root")}
-                    >
-                      {copiedKey === "root" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="proof-item">
-                  <span className="proof-label">Leaf Hash (Request Data):</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="proof-val">{submitResult.leaf}</span>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ padding: "2px 6px" }}
-                      onClick={() => copyToClipboard(submitResult.leaf, "leaf")}
-                    >
-                      {copiedKey === "leaf" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sibling Array Breakdown */}
-                {showProofDetails && (
-                  <div style={{ marginTop: "12px", background: "rgba(0,0,0,0.4)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "8px" }}>
-                      Sibling Hashes (Depth 8 Proof Path):
-                    </div>
-                    {proofResult.proof.map((sibling, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", padding: "4px 0", borderBottom: i < 7 ? "1px dashed rgba(255,255,255,0.06)" : "none" }}>
-                        <span className="mono" style={{ color: "var(--terracotta-400)" }}>[Level {i}]</span>
-                        <span className="mono" style={{ color: "var(--text-muted)" }}>{sibling}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Bar: Network Switch / Submit */}
+            {/* Action Bar: Network Switch / Submit to Polygon Amoy */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
               <div>
                 {chainId !== NETWORKS.amoy.chainIdDec && (
@@ -1419,37 +1291,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* ── Standalone Merkle Tree Visualizer Modal ───────────────────────────── */}
-      {showMerkleVisualizerModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.78)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
-          }}
-          onClick={() => setShowMerkleVisualizerModal(false)}
-        >
-          <div
-            style={{ maxWidth: "860px", width: "100%", maxHeight: "90vh", overflowY: "auto" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MerkleTreeVisualizer
-              root={proofResult?.header.root}
-              leaf={submitResult?.leaf}
-              proof={proofResult?.proof}
-              requestId={submitResult?.id}
-              onClose={() => setShowMerkleVisualizerModal(false)}
-            />
-          </div>
-        </div>
-      )}
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>

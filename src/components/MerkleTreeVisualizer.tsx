@@ -23,6 +23,8 @@ interface MerkleTreeVisualizerProps {
   requestId?: bigint | number;
   onClose?: () => void;
   isInline?: boolean;
+  autoAnimate?: boolean;
+  onAnimationComplete?: () => void;
 }
 
 function commutativeKeccak256(a: string, b: string): { result: string; lo: string; hi: string; isALo: boolean } {
@@ -49,11 +51,14 @@ export default function MerkleTreeVisualizer({
   requestId = 0n,
   onClose,
   isInline = false,
+  autoAnimate = true,
+  onAnimationComplete,
 }: MerkleTreeVisualizerProps) {
   const [activeStep, setActiveStep] = useState<number>(0);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"ladder" | "tree">("ladder");
-  const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(autoAnimate);
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   // Fallback sample data if opened without an active transaction proof
   const sampleData = useMemo(() => {
@@ -97,6 +102,26 @@ export default function MerkleTreeVisualizer({
     return { steps, computedRoot: currentHash };
   }, [activeLeaf, activeProof]);
 
+  // Automated step-by-step playback timer
+  React.useEffect(() => {
+    let timer: number;
+    if (isPlaying && !isCompleted) {
+      timer = window.setInterval(() => {
+        setActiveStep((prev) => {
+          if (prev < TREE_DEPTH - 1) {
+            return prev + 1;
+          } else {
+            setIsPlaying(false);
+            setIsCompleted(true);
+            onAnimationComplete?.();
+            return prev;
+          }
+        });
+      }, 700);
+    }
+    return () => clearInterval(timer);
+  }, [isPlaying, isCompleted, onAnimationComplete]);
+
   const targetRoot = root || verificationSteps.computedRoot;
   const isRootMatching = verificationSteps.computedRoot.toLowerCase() === targetRoot.toLowerCase();
 
@@ -107,7 +132,14 @@ export default function MerkleTreeVisualizer({
   };
 
   const handleNextStep = () => {
+    setIsPlaying(false);
     setActiveStep((prev) => (prev < TREE_DEPTH - 1 ? prev + 1 : 0));
+  };
+
+  const handleReplay = () => {
+    setActiveStep(0);
+    setIsCompleted(false);
+    setIsPlaying(true);
   };
 
   const currentStepData = verificationSteps.steps[activeStep];
@@ -273,7 +305,37 @@ export default function MerkleTreeVisualizer({
                 </span>
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className={`btn ${isPlaying ? "btn-primary" : "btn-secondary"}`}
+                  style={{ padding: "5px 12px", fontSize: "12px", gap: "6px" }}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  title={isPlaying ? "Pause live step calculation" : "Play step-by-step animation"}
+                >
+                  {isPlaying ? (
+                    <>
+                      <span className="animate-pulse" style={{ display: "inline-block" }}>●</span>
+                      Stepping (Lvl {activeStep}/7)...
+                    </>
+                  ) : (
+                    <>
+                      <Play size={13} />
+                      Play Animation
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: "5px 10px", fontSize: "12px" }}
+                  onClick={handleReplay}
+                  title="Replay verification from Level 0"
+                >
+                  <RotateCcw size={13} />
+                </button>
+
                 <button
                   type="button"
                   className="btn btn-secondary"
