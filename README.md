@@ -1,4 +1,4 @@
-# ⚡ Vecnaverse: Decentralized Cross-Chain Transaction Verification
+# ⚡ CryptoXchange: Decentralized Cross-Chain Transaction Verification
 
 > **User-mediated, relayer-free cross-chain transaction verification.** No coordinator chains (Axelar / LayerZero / CCIP), zero backend, no protocol changes.
 
@@ -6,7 +6,7 @@
 
 ## 📖 Overview
 
-Vecnaverse demonstrates a decentralized, client-mediated cross-chain bridge between **Ethereum Sepolia (N1)** and **Polygon Amoy (N2)**:
+CryptoXchange demonstrates a decentralized, client-mediated cross-chain bridge between **Ethereum Sepolia (N1)** and **Polygon Amoy (N2)**:
 
 1. **Phase 1 (Sepolia)**: The user locks native ETH into `Router.sol`. The request data `keccak256(abi.encode(id, sender, recipient, value, deadline))` is appended as a leaf to an OpenZeppelin incremental Merkle tree (depth 8) on-chain.
 2. **Phase 2 (Client)**: The client listens for block confirmations, fetches all on-chain `RequestCreated` events from the Router, reconstructs the identical depth-8 Merkle tree off-chain, verifies that the computed root matches `Router.root()`, and extracts the 8-sibling inclusion proof.
@@ -19,7 +19,7 @@ Vecnaverse demonstrates a decentralized, client-mediated cross-chain bridge betw
 
 | Approach | Typical Latency | Trust Assumptions |
 |---|---|---|
-| **Vecnaverse (User-Mediated)** | **~9.75 seconds** (Local) / N confirmations (Live) | Direct on-chain verification, self-relayed |
+| **CryptoXchange (User-Mediated)** | **~9.75 seconds** (Local) / N confirmations (Live) | Direct on-chain verification, self-relayed |
 | **Coordinator Chains (LayerZero, Axelar, CCIP)** | **119.7 seconds** (Standard baseline) | Quorum polling, relayer networks, intermediate chain finality |
 
 ---
@@ -27,7 +27,7 @@ Vecnaverse demonstrates a decentralized, client-mediated cross-chain bridge betw
 ## 🛠️ Project Structure
 
 ```text
-Vecnaverse/
+CryptoXchange/
 ├── contracts/
 │   ├── Router.sol                # Locks ETH on N1 (Sepolia), pushes to incremental Merkle tree
 │   ├── Verifier.sol              # Verifies Merkle proof on N2 (Amoy), mints wDEMO

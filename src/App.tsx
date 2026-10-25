@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Coins,
   Cpu,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -134,13 +135,16 @@ export default function App() {
   // ── MetaMask Listeners ───────────────────────────────────────────────────
   useEffect(() => {
     if (window.ethereum) {
-      window.ethereum.request({ method: "eth_accounts" }).then((accounts: string[]) => {
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-          if (!recipient) setRecipient(accounts[0]);
-          if (phase === "CONNECT") setPhase("PHASE1_FORM");
-        }
-      }).catch(console.error);
+      const isDisconnected = sessionStorage.getItem("wallet_disconnected") === "true";
+      if (!isDisconnected) {
+        window.ethereum.request({ method: "eth_accounts" }).then((accounts: string[]) => {
+          if (accounts.length > 0) {
+            setAccount(accounts[0]);
+            if (!recipient) setRecipient(accounts[0]);
+            if (phase === "CONNECT") setPhase("PHASE1_FORM");
+          }
+        }).catch(console.error);
+      }
 
       window.ethereum.request({ method: "eth_chainId" }).then((cId: string) => {
         setChainId(parseInt(cId, 16));
@@ -171,6 +175,7 @@ export default function App() {
 
   // Connect Wallet
   const connectWallet = async () => {
+    sessionStorage.removeItem("wallet_disconnected");
     if (!window.ethereum) {
       alert("Please install MetaMask to interact with this dApp.");
       return;
@@ -381,6 +386,22 @@ export default function App() {
     startTimeRef.current = null;
   };
 
+  const logoutWallet = () => {
+    sessionStorage.setItem("wallet_disconnected", "true");
+    setAccount("");
+    setChainId(null);
+    setPhase("CONNECT");
+    setRecipient("");
+    setSubmitResult(null);
+    setProofResult(null);
+    setVerifyTxHash("");
+    setWDemoBalance("");
+    setErrorMessage("");
+    setElapsedMs(0);
+    setTimerRunning(false);
+    startTimeRef.current = null;
+  };
+
   const elapsedSec = (elapsedMs / 1000).toFixed(1);
   const baselineSec = COORDINATOR_CHAIN_BASELINE_SECONDS.toFixed(1);
   const isFaster = parseFloat(elapsedSec) > 0 && parseFloat(elapsedSec) < COORDINATOR_CHAIN_BASELINE_SECONDS;
@@ -394,7 +415,7 @@ export default function App() {
           <div className="brand-icon">⚡</div>
           <div>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <h1 className="brand-title">VECNAVERSE</h1>
+              <h1 className="brand-title">CryptoXchange</h1>
               <span className="brand-badge">User-Mediated</span>
             </div>
             <p className="brand-subtitle">
@@ -417,6 +438,15 @@ export default function App() {
               <div className="badge mono" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-subtle)" }}>
                 {account.slice(0, 6)}...{account.slice(-4)}
               </div>
+              <button
+                className="btn btn-danger"
+                style={{ padding: "6px 12px", fontSize: "12px", gap: "6px" }}
+                onClick={logoutWallet}
+                title="Disconnect MetaMask Wallet"
+              >
+                <LogOut size={13} />
+                Logout
+              </button>
             </div>
           ) : (
             <button className="btn btn-primary" onClick={connectWallet} disabled={isConnecting}>
@@ -956,7 +986,7 @@ export default function App() {
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
-        <p>VECNAVERSE · OpenZeppelin Incremental MerkleTree ^5.1 · Ethers v6 · User-Mediated Verification Demo</p>
+        <p>CryptoXchange · OpenZeppelin Incremental MerkleTree ^5.1 · Ethers v6 · User-Mediated Verification Demo</p>
       </footer>
     </div>
   );
