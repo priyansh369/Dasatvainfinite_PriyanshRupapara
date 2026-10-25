@@ -679,52 +679,104 @@ export default function App() {
 
       {/* ── Collapsible Configuration Drawer ─────────────────────────────────── */}
       {showConfig && (
-        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--mauve-700)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Settings size={16} /> Deployments & Network Override
-            </h3>
-            <div style={{ display: "flex", gap: "8px" }}>
+        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--mauve-600)", background: "rgba(18, 8, 21, 0.95)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "10px" }}>
+            <div>
+              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Settings size={18} style={{ color: "var(--terracotta-400)" }} />
+                Developer & Smart Contract Settings
+              </h3>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+                These are the on-chain smart contract addresses power the cross-chain bridge. You <strong>do not need to change these</strong> unless you deployed your own contracts.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
+                <button
+                  type="button"
+                  className={`btn ${networkMode === "testnet" ? "btn-primary" : "btn-secondary"}`}
+                  style={{ padding: "5px 12px", fontSize: "11px", border: "none" }}
+                  onClick={() => setNetworkMode("testnet")}
+                >
+                  Sepolia / Amoy Testnet
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${networkMode === "local" ? "btn-primary" : "btn-secondary"}`}
+                  style={{ padding: "5px 12px", fontSize: "11px", border: "none" }}
+                  onClick={() => setNetworkMode("local")}
+                >
+                  Local Hardhat Nodes
+                </button>
+              </div>
+
               <button
-                className={`btn ${networkMode === "testnet" ? "btn-primary" : "btn-secondary"}`}
-                style={{ padding: "6px 14px", fontSize: "12px" }}
-                onClick={() => setNetworkMode("testnet")}
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "5px 10px", fontSize: "11px" }}
+                onClick={() => setShowConfig(false)}
               >
-                Testnets (Sepolia / Amoy)
-              </button>
-              <button
-                className={`btn ${networkMode === "local" ? "btn-primary" : "btn-secondary"}`}
-                style={{ padding: "6px 14px", fontSize: "12px" }}
-                onClick={() => setNetworkMode("local")}
-              >
-                Localhost (Port 8545 / 8546)
+                Close ✕
               </button>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
-            <div>
-              <label className="input-label">N1 Router Address (Sepolia)</label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "16px" }}>
+            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--terracotta-300)" }}>
+                  🔷 N1 Router Contract (Sepolia)
+                </label>
+                <span className="badge badge-sepolia" style={{ fontSize: "10px" }}>Source Chain</span>
+              </div>
+              <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: 1.4 }}>
+                Locks native ETH into a vault and appends the transaction leaf into the on-chain Merkle tree.
+              </p>
               <input
                 className="input-field mono"
+                style={{ fontSize: "11px" }}
                 value={routerAddress}
                 onChange={(e) => setRouterAddress(e.target.value)}
+                placeholder="0x..."
               />
             </div>
-            <div>
-              <label className="input-label">N2 Verifier Address (Amoy)</label>
+
+            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--mauve-300)" }}>
+                  🟣 N2 Verifier Contract (Amoy)
+                </label>
+                <span className="badge badge-amoy" style={{ fontSize: "10px" }}>Destination Chain</span>
+              </div>
+              <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: 1.4 }}>
+                Verifies the 8-depth Merkle proof submitted by your browser and authorizes the token minting.
+              </p>
               <input
                 className="input-field mono"
+                style={{ fontSize: "11px" }}
                 value={verifierAddress}
                 onChange={(e) => setVerifierAddress(e.target.value)}
+                placeholder="0x..."
               />
             </div>
-            <div>
-              <label className="input-label">N2 WrappedDemo Token Address (wDEMO)</label>
+
+            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--mauve-200)" }}>
+                  🪙 WrappedDemo Token (wDEMO)
+                </label>
+                <span className="badge" style={{ fontSize: "10px", background: "rgba(255,255,255,0.08)" }}>ERC-20</span>
+              </div>
+              <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: 1.4 }}>
+                The synthetic bridged token on Polygon Amoy minted directly to your destination recipient address.
+              </p>
               <input
                 className="input-field mono"
+                style={{ fontSize: "11px" }}
                 value={wrappedDemoAddress}
                 onChange={(e) => setWrappedDemoAddress(e.target.value)}
+                placeholder="0x..."
               />
             </div>
           </div>
