@@ -19,6 +19,9 @@ import {
   Coins,
   Cpu,
   LogOut,
+  Wallet,
+  Plus,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -85,6 +88,13 @@ export default function App() {
   const [verifierAddress, setVerifierAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.verifier);
   const [wrappedDemoAddress, setWrappedDemoAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.wrappedDemo);
 
+  // ── Token & Wallet Balances State ─────────────────────────────────────────
+  const [nativeBalance, setNativeBalance] = useState<string>("0.000");
+  const [wDemoTokenBalance, setWDemoTokenBalance] = useState<string>("0.000");
+  const [selectedToken, setSelectedToken] = useState<string>("ETH");
+  const [isRefreshingBalances, setIsRefreshingBalances] = useState<boolean>(false);
+  const [tokenImported, setTokenImported] = useState<boolean>(false);
+
   // ── Timer Effect ─────────────────────────────────────────────────────────
   useEffect(() => {
     let interval: number;
@@ -132,6 +142,70 @@ export default function App() {
     return new ethers.JsonRpcProvider(rpc);
   };
 
+  // ── Fetch Token Balances from MetaMask ───────────────────────────────────
+  const fetchBalances = async (accountAddr?: string) => {
+    const targetAddr = accountAddr || account;
+    if (!targetAddr) return;
+    setIsRefreshingBalances(true);
+
+    try {
+      // 1. Fetch Sepolia Native ETH balance
+      const n1 = getN1Provider();
+      const n1Bal = await n1.getBalance(targetAddr);
+      setNativeBalance(parseFloat(ethers.formatEther(n1Bal)).toFixed(4));
+    } catch (e) {
+      console.warn("N1 balance fetch:", e);
+    }
+
+    try {
+      // 2. Fetch Amoy wDEMO balance
+      const n2 = getN2Provider();
+      const wDemo = new ethers.Contract(wrappedDemoAddress, WRAPPED_DEMO_ABI, n2);
+      const wDemoBal = await wDemo.balanceOf(targetAddr);
+      const dec = await wDemo.decimals();
+      setWDemoTokenBalance(parseFloat(ethers.formatUnits(wDemoBal, dec)).toFixed(4));
+    } catch (e) {
+      console.warn("wDEMO balance fetch:", e);
+    } finally {
+      setIsRefreshingBalances(false);
+    }
+  };
+
+  // Add wDEMO token directly to user's MetaMask extension assets
+  const importWDEMOToMetaMask = async () => {
+    if (!window.ethereum) return;
+    try {
+      const wasAdded = await window.ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address: wrappedDemoAddress,
+            symbol: "wDEMO",
+            decimals: 18,
+            image: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+          },
+        },
+      });
+      if (wasAdded) {
+        setTokenImported(true);
+        setTimeout(() => setTokenImported(false), 3000);
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleMax = () => {
+    if (selectedToken === "ETH") {
+      const maxVal = Math.max(0, parseFloat(nativeBalance) - 0.002);
+      setAmountEth(maxVal > 0 ? maxVal.toFixed(4) : nativeBalance);
+    } else {
+      setAmountEth(wDemoTokenBalance);
+    }
+  };
+
   // ── MetaMask Listeners ───────────────────────────────────────────────────
   useEffect(() => {
     if (window.ethereum) {
@@ -142,6 +216,7 @@ export default function App() {
             setAccount(accounts[0]);
             if (!recipient) setRecipient(accounts[0]);
             if (phase === "CONNECT") setPhase("PHASE1_FORM");
+            fetchBalances(accounts[0]);
           }
         }).catch(console.error);
       }
@@ -153,6 +228,7 @@ export default function App() {
       const handleAccounts = (accounts: string[]) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
+          fetchBalances(accounts[0]);
         } else {
           setAccount("");
           setPhase("CONNECT");
@@ -161,6 +237,7 @@ export default function App() {
 
       const handleChainChanged = (cId: string) => {
         setChainId(parseInt(cId, 16));
+        fetchBalances();
       };
 
       window.ethereum.on("accountsChanged", handleAccounts);
@@ -173,21 +250,38 @@ export default function App() {
     }
   }, [phase, recipient]);
 
-  // Connect Wallet
+  // Connect Wallet — Prompt MetaMask extension window automatically
   const connectWallet = async () => {
     sessionStorage.removeItem("wallet_disconnected");
     if (!window.ethereum) {
-      alert("Please install MetaMask to interact with this dApp.");
+      window.open("https://metamask.io/download/", "_blank");
       return;
     }
     setIsConnecting(true);
     setErrorMessage("");
     try {
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      if (accounts.length > 0) {
+      let accounts: string[] = [];
+      // Request permissions to ensure MetaMask browser extension window pops open automatically
+      try {
+        const permissions = await window.ethereum.request({
+          method: "wallet_requestPermissions",
+          params: [{ eth_accounts: {} }],
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const accPerm = permissions?.find((p: any) => p.parentCapability === "eth_accounts");
+        if (accPerm) {
+          accounts = await window.ethereum.request({ method: "eth_accounts" });
+        }
+      } catch {
+        // Fallback to standard request
+        accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      }
+
+      if (accounts && accounts.length > 0) {
         setAccount(accounts[0]);
         if (!recipient) setRecipient(accounts[0]);
         setPhase("PHASE1_FORM");
+        await fetchBalances(accounts[0]);
       }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -575,6 +669,56 @@ export default function App() {
         </div>
       </div>
 
+      {/* ── MetaMask Token Portfolio Bar ───────────────────────────────────────── */}
+      {account && (
+        <div className="token-portfolio-bar">
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Wallet size={16} style={{ color: "var(--terracotta-400)" }} />
+              <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
+                MetaMask Assets:
+              </span>
+            </div>
+
+            <div className="token-list">
+              <div className="token-chip" onClick={() => setSelectedToken("ETH")} title="Select Sepolia ETH">
+                <span>🔷</span>
+                <span className="token-chip-symbol">Sepolia ETH:</span>
+                <span className="token-chip-balance">{nativeBalance} ETH</span>
+              </div>
+              <div className="token-chip" onClick={() => setSelectedToken("wDEMO")} title="Select Amoy wDEMO">
+                <span>🟣</span>
+                <span className="token-chip-symbol">Amoy wDEMO:</span>
+                <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              type="button"
+              className="btn-import-token"
+              onClick={importWDEMOToMetaMask}
+              title="Add wDEMO token into your MetaMask extension"
+            >
+              {tokenImported ? <Check size={13} color="#34d399" /> : <Plus size={13} />}
+              {tokenImported ? "Added to MetaMask!" : "Add wDEMO to MetaMask"}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: "6px 10px" }}
+              onClick={() => fetchBalances()}
+              disabled={isRefreshingBalances}
+              title="Refresh balances from MetaMask"
+            >
+              <RefreshCw size={13} className={isRefreshingBalances ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 2-Phase Stepper Navigation ────────────────────────────────────────── */}
       <div className="stepper-nav">
         {/* Step 1: Sepolia Lock */}
@@ -658,6 +802,40 @@ export default function App() {
               <span className="badge badge-sepolia">Sepolia (N1)</span>
             </div>
 
+            {/* Token Selector & Asset Balance Selection */}
+            <div style={{ marginBottom: "20px" }}>
+              <label className="input-label">Select Asset to Lock & Bridge</label>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                <div
+                  className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
+                  onClick={() => setSelectedToken("ETH")}
+                >
+                  <span>🔷</span>
+                  <span className="token-chip-symbol">ETH (Sepolia Native)</span>
+                  <span className="token-chip-balance">{nativeBalance} ETH</span>
+                </div>
+
+                <div
+                  className={`token-chip ${selectedToken === "wDEMO" ? "active" : ""}`}
+                  onClick={() => setSelectedToken("wDEMO")}
+                >
+                  <span>🟣</span>
+                  <span className="token-chip-symbol">wDEMO (Polygon Amoy)</span>
+                  <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-import-token"
+                  onClick={importWDEMOToMetaMask}
+                  title="Add wDEMO token into your MetaMask wallet"
+                >
+                  {tokenImported ? <Check size={12} color="#34d399" /> : <Plus size={12} />}
+                  {tokenImported ? "Added to MetaMask!" : "Add wDEMO to MetaMask"}
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "24px" }}>
               <div className="input-group">
                 <label className="input-label">Destination Recipient Address (Amoy N2)</label>
@@ -670,14 +848,26 @@ export default function App() {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Lock Value (Sepolia ETH)</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  className="input-field mono"
-                  value={amountEth}
-                  onChange={(e) => setAmountEth(e.target.value)}
-                />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label className="input-label" style={{ marginBottom: 0 }}>
+                    Lock Value ({selectedToken})
+                  </label>
+                  <span style={{ fontSize: "12px", color: "var(--mauve-300)" }}>
+                    Available: <span className="mono" style={{ color: "var(--terracotta-300)" }}>{selectedToken === "ETH" ? nativeBalance : wDemoTokenBalance} {selectedToken}</span>
+                  </span>
+                </div>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    step="0.0001"
+                    className="input-field mono"
+                    value={amountEth}
+                    onChange={(e) => setAmountEth(e.target.value)}
+                  />
+                  <button type="button" className="btn-max" onClick={handleMax}>
+                    MAX
+                  </button>
+                </div>
               </div>
 
               <div className="input-group">
