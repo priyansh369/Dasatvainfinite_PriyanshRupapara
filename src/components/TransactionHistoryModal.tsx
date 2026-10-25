@@ -47,8 +47,6 @@ export default function TransactionHistoryModal({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
-  if (!isOpen) return null;
-
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
@@ -61,9 +59,11 @@ export default function TransactionHistoryModal({
     setShowConfirmClear(false);
   };
 
-  // Filtered & searched transactions
+  // Filtered & searched transactions (Hooks must unconditionally run before any return)
   const filteredTxs = useMemo(() => {
+    if (!Array.isArray(transactions)) return [];
     return transactions.filter((tx) => {
+      if (!tx) return false;
       // Tab filter
       if (filterTab === "minted" && tx.status !== "minted") return false;
       if (filterTab === "locked" && tx.status !== "locked") return false;
@@ -73,24 +73,25 @@ export default function TransactionHistoryModal({
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
       return (
-        tx.id.toLowerCase().includes(q) ||
-        tx.amount.toLowerCase().includes(q) ||
-        tx.token.toLowerCase().includes(q) ||
-        tx.recipient.toLowerCase().includes(q) ||
+        (tx.id || "").toLowerCase().includes(q) ||
+        (tx.amount || "").toLowerCase().includes(q) ||
+        (tx.token || "").toLowerCase().includes(q) ||
+        (tx.recipient || "").toLowerCase().includes(q) ||
         (tx.sourceTxHash && tx.sourceTxHash.toLowerCase().includes(q)) ||
         (tx.destTxHash && tx.destTxHash.toLowerCase().includes(q)) ||
-        tx.sourceChain.name.toLowerCase().includes(q) ||
-        tx.destChain.name.toLowerCase().includes(q)
+        (tx.sourceChain?.name && tx.sourceChain.name.toLowerCase().includes(q)) ||
+        (tx.destChain?.name && tx.destChain.name.toLowerCase().includes(q))
       );
     });
   }, [transactions, filterTab, searchQuery]);
 
   const counts = useMemo(() => {
+    if (!Array.isArray(transactions)) return { all: 0, minted: 0, locked: 0, demo: 0 };
     return {
       all: transactions.length,
-      minted: transactions.filter((t) => t.status === "minted").length,
-      locked: transactions.filter((t) => t.status === "locked").length,
-      demo: transactions.filter((t) => t.isDemo).length,
+      minted: transactions.filter((t) => t?.status === "minted").length,
+      locked: transactions.filter((t) => t?.status === "locked").length,
+      demo: transactions.filter((t) => Boolean(t?.isDemo)).length,
     };
   }, [transactions]);
 
@@ -114,7 +115,7 @@ export default function TransactionHistoryModal({
   };
 
   const handleExportAll = () => {
-    if (transactions.length === 0) return;
+    if (!transactions || transactions.length === 0) return;
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
       JSON.stringify(transactions, null, 2)
     )}`;
@@ -125,6 +126,9 @@ export default function TransactionHistoryModal({
     downloadAnchor.click();
     downloadAnchor.remove();
   };
+
+  // Safe to return now that all hooks have been invoked
+  if (!isOpen) return null;
 
   return (
     <div
@@ -546,12 +550,12 @@ export default function TransactionHistoryModal({
                           border: "1px solid rgba(255, 255, 255, 0.08)",
                         }}
                       >
-                        <span style={{ fontSize: "14px" }}>{tx.sourceChain.icon || "🔷"}</span>
+                        <span style={{ fontSize: "14px" }}>{tx.sourceChain?.icon || "🔷"}</span>
                         <span style={{ fontSize: "13px", fontWeight: "700", color: "#f8fafc" }}>
                           {tx.amount} {tx.token}
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                          ({tx.sourceChain.name})
+                          ({tx.sourceChain?.name || "Ethereum"})
                         </span>
                       </div>
 
@@ -570,12 +574,12 @@ export default function TransactionHistoryModal({
                           border: "1px solid rgba(130, 71, 229, 0.3)",
                         }}
                       >
-                        <span style={{ fontSize: "14px" }}>{tx.destChain.icon || "🟣"}</span>
+                        <span style={{ fontSize: "14px" }}>{tx.destChain?.icon || "🟣"}</span>
                         <span style={{ fontSize: "13px", fontWeight: "700", color: "#c084fc" }}>
                           {tx.amount} wDEMO
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                          ({tx.destChain.name})
+                          ({tx.destChain?.name || "Polygon Amoy"})
                         </span>
                       </div>
                     </div>

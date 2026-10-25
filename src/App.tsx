@@ -1541,16 +1541,18 @@ export default function App() {
       </div>
 
       {/* ── Transaction History & Proof Explorer Modal ──────────────────────── */}
-      <TransactionHistoryModal
-        isOpen={showHistory}
-        onClose={() => setShowHistory(false)}
-        transactions={transactions}
-        onTransactionsChange={setTransactions}
-        onTriggerDemo={() => {
-          setIsDemoMode(true);
-          resetFlow();
-        }}
-      />
+      {showHistory && (
+        <TransactionHistoryModal
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          transactions={transactions}
+          onTransactionsChange={setTransactions}
+          onTriggerDemo={() => {
+            setIsDemoMode(true);
+            resetFlow();
+          }}
+        />
+      )}
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>

@@ -37,11 +37,15 @@ const STORAGE_KEY = "cryptoxchange_tx_history_v1";
  */
 export function loadTransactions(): BridgeTransaction[] {
   try {
+    if (typeof window === "undefined" || !window.localStorage) return [];
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      return parsed.filter(
+        (item): item is BridgeTransaction =>
+          Boolean(item && typeof item === "object" && typeof item.id === "string")
+      );
     }
     return [];
   } catch (err) {
