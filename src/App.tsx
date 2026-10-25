@@ -22,6 +22,7 @@ import {
   Wallet,
   Plus,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 
 import {
@@ -30,6 +31,7 @@ import {
   buildProof,
   submitToVerifier,
   reclaimRequest,
+  buildDemoProof,
   CrossChainConfig,
   ProofResult,
   SubmitResult,
@@ -82,6 +84,7 @@ export default function App() {
   const [showProofDetails, setShowProofDetails] = useState<boolean>(true);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   // Custom contract overrides
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
@@ -335,6 +338,36 @@ export default function App() {
     if (!account) return;
     setIsBusy(true);
     setErrorMessage("");
+
+    // 🎮 Demo Simulation Mode (Zero gas & instant execution)
+    if (isDemoMode) {
+      startStopwatch();
+      try {
+        const demo = buildDemoProof(account, recipient || account, amountEth);
+        setSubmitResult(demo.submitResult);
+        setPhase("PHASE1_CONFIRMING");
+
+        // Simulate 3 block confirmations with live visual feedback
+        setCurrentConfirmations(1);
+        await new Promise((r) => setTimeout(r, 700));
+        setCurrentConfirmations(2);
+        await new Promise((r) => setTimeout(r, 700));
+        setCurrentConfirmations(3);
+        await new Promise((r) => setTimeout(r, 500));
+
+        setProofResult({ proof: demo.proof, header: demo.header, request: demo.request });
+        setPhase("PHASE1_PROOF");
+      } catch (err: unknown) {
+        setErrorMessage(err instanceof Error ? err.message : String(err));
+        stopStopwatch();
+        setPhase("FAILED");
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
+
+    // 🌐 Live Network Flow
     try {
       // Ensure on Sepolia or Localhost N1
       const targetChainId = networkMode === "testnet" ? NETWORKS.sepolia.chainIdDec : 31337;
@@ -345,6 +378,17 @@ export default function App() {
       startStopwatch();
 
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
+
+      // Pre-flight validation: check if contract is actually deployed
+      const code = await browserProvider.getCode(routerAddress);
+      if (!code || code === "0x" || code === "0x0") {
+        throw new Error(
+          `No Router smart contract is deployed at ${routerAddress} on ${
+            networkMode === "testnet" ? "Ethereum Sepolia" : "Chain #" + chainId
+          }. Please toggle to "Demo Simulation Mode" above to test with zero gas, or deploy Router.sol and configure its address in Settings (⚙️).`
+        );
+      }
+
       const n2Provider = getN2Provider();
 
       const config: CrossChainConfig = {
@@ -372,10 +416,9 @@ export default function App() {
         1500
       );
 
-      // 3. Build proof off-chain
+      // 3. Build proof off-chain using bounded block window
       setPhase("PHASE1_PROOF");
-      // Use n1Provider to rebuild tree from on-chain logs
-      const proof = await buildProof(config, sub.id);
+      const proof = await buildProof(config, sub.id, sub.blockNumber);
       setProofResult(proof);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -391,6 +434,30 @@ export default function App() {
     if (!proofResult || !submitResult) return;
     setIsBusy(true);
     setErrorMessage("");
+
+    // 🎮 Demo Simulation Mode
+    if (isDemoMode) {
+      try {
+        setPhase("PHASE2_VERIFYING");
+        await new Promise((r) => setTimeout(r, 1400));
+        const fakeAmoyTx = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        setVerifyTxHash(fakeAmoyTx);
+        setWDemoBalance(amountEth);
+        stopStopwatch();
+        setPhase("SUCCESS");
+      } catch (err: unknown) {
+        setErrorMessage(err instanceof Error ? err.message : String(err));
+        stopStopwatch();
+        setPhase("FAILED");
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
+
+    // 🌐 Live Network Flow
     try {
       // Ensure on Polygon Amoy or Localhost N2
       const targetChainId = networkMode === "testnet" ? NETWORKS.amoy.chainIdDec : 31337;
@@ -399,6 +466,15 @@ export default function App() {
       }
 
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
+
+      // Pre-flight check: ensure Verifier contract is deployed
+      const verifierCode = await browserProvider.getCode(verifierAddress);
+      if (!verifierCode || verifierCode === "0x" || verifierCode === "0x0") {
+        throw new Error(
+          `No Verifier contract found at ${verifierAddress} on Polygon Amoy. Please enable "Demo Simulation Mode" or configure the address in Settings.`
+        );
+      }
+
       const n1Provider = getN1Provider();
 
       const config: CrossChainConfig = {
@@ -518,7 +594,30 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* Mode Switcher: Live vs Demo Simulation */}
+          <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
+            <button
+              type="button"
+              className={`btn ${!isDemoMode ? "btn-primary" : "btn-secondary"}`}
+              style={{ padding: "5px 12px", fontSize: "11px", border: "none" }}
+              onClick={() => setIsDemoMode(false)}
+              title="Live on-chain interactions with MetaMask transactions"
+            >
+              🌐 Live On-Chain
+            </button>
+            <button
+              type="button"
+              className={`btn ${isDemoMode ? "btn-primary" : "btn-secondary"}`}
+              style={{ padding: "5px 12px", fontSize: "11px", border: "none", gap: "4px" }}
+              onClick={() => setIsDemoMode(true)}
+              title="Instant cryptographic demo with zero gas needed"
+            >
+              <Sparkles size={12} />
+              Demo Simulation
+            </button>
+          </div>
+
           {account ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span className={`badge ${chainId === NETWORKS.amoy.chainIdDec ? "badge-amoy" : "badge-sepolia"}`}>
@@ -558,6 +657,25 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* ── Demo Mode Active Indicator Banner ────────────────────────────────── */}
+      {isDemoMode && (
+        <div style={{ background: "rgba(176, 116, 159, 0.15)", border: "1px solid var(--mauve-500)", borderRadius: "var(--radius-md)", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Sparkles size={16} style={{ color: "var(--mauve-300)" }} />
+            <span style={{ fontSize: "13px", color: "var(--mauve-100)" }}>
+              <strong>Demo Simulation Mode Active:</strong> Generates real cryptographic depth-8 Merkle proofs off-chain with simulated latency. Zero testnet gas or contract deployment required!
+            </span>
+          </div>
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "4px 10px", fontSize: "11px" }}
+            onClick={() => setIsDemoMode(false)}
+          >
+            Switch to Live On-Chain
+          </button>
+        </div>
+      )}
 
       {/* ── Collapsible Configuration Drawer ─────────────────────────────────── */}
       {showConfig && (
@@ -1153,19 +1271,46 @@ export default function App() {
               <HelpCircle size={28} color="#ef4444" />
             </div>
             <h2 style={{ fontSize: "22px", fontWeight: "800", color: "#f87171", marginBottom: "8px" }}>
-              Transaction Failed or Expired
+              {errorMessage?.includes("No Router") || errorMessage?.includes("bytecode") || errorMessage?.includes("No RequestCreated")
+                ? "Contract Not Deployed on This Network"
+                : "Transaction Issue Detected"}
             </h2>
-            <p style={{ color: "var(--text-muted)", fontSize: "14px", maxWidth: "480px", margin: "0 auto 24px auto" }}>
-              If your request on Sepolia has passed its deadline (+ 1 hour), you can safely reclaim your locked ETH from Router.sol.
-            </p>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: "14px" }}>
+            {/* Diagnostic Message Box */}
+            <div style={{ color: "var(--text-secondary)", fontSize: "14px", maxWidth: "600px", margin: "0 auto 24px auto", background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", textAlign: "left" }}>
+              <div style={{ fontWeight: "700", color: "#fca5a5", marginBottom: "6px" }}>Diagnostic Details:</div>
+              <div className="mono" style={{ fontSize: "12px", color: "var(--text-muted)", wordBreak: "break-word", lineHeight: 1.5 }}>
+                {errorMessage || "An unexpected error occurred during execution."}
+              </div>
+              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "var(--mauve-200)" }}>
+                💡 <strong>Instant Solution:</strong> Click <strong>"Switch to Demo Simulation Mode"</strong> below to execute the complete cryptographic cross-chain transfer (Merkle proof generation + verification) instantly with zero gas!
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsDemoMode(true);
+                  resetFlow();
+                }}
+              >
+                <Sparkles size={16} />
+                Switch to Demo Simulation Mode & Run
+              </button>
               {submitResult && (
                 <button className="btn btn-danger" onClick={handleReclaim} disabled={isBusy}>
                   <RotateCcw size={16} />
                   {isBusy ? "Reclaiming..." : "Reclaim Locked ETH (Sepolia)"}
                 </button>
               )}
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowConfig(true)}
+              >
+                <Settings size={16} />
+                Configure Contracts
+              </button>
               <button className="btn btn-secondary" onClick={resetFlow}>
                 Restart Flow
               </button>
