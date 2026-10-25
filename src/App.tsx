@@ -428,7 +428,7 @@ export default function App() {
           {account ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span className={`badge ${chainId === NETWORKS.amoy.chainIdDec ? "badge-amoy" : "badge-sepolia"}`}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: chainId === NETWORKS.amoy.chainIdDec ? "#a855f7" : "#f43f5e" }} />
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: chainId === NETWORKS.amoy.chainIdDec ? "var(--mauve-400)" : "var(--terracotta-500)" }} />
                 {chainId === NETWORKS.amoy.chainIdDec
                   ? "Polygon Amoy"
                   : chainId === NETWORKS.sepolia.chainIdDec
@@ -467,7 +467,7 @@ export default function App() {
 
       {/* ── Collapsible Configuration Drawer ─────────────────────────────────── */}
       {showConfig && (
-        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--crimson-700)" }}>
+        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--mauve-700)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
               <Settings size={16} /> Deployments & Network Override
@@ -520,10 +520,10 @@ export default function App() {
       )}
 
       {/* ── Benchmark Stopwatch & Comparison Banner ──────────────────────────── */}
-      <div className="benchmark-card glow-crimson">
+      <div className="benchmark-card glow-terracotta">
         <div className="benchmark-header">
           <div className="benchmark-title">
-            <Zap size={16} style={{ color: "var(--crimson-400)" }} />
+            <Zap size={16} style={{ color: "var(--terracotta-400)" }} />
             End-to-End Latency vs Coordinator Baseline
           </div>
           {isFaster && (
@@ -538,7 +538,7 @@ export default function App() {
           <div className="metric-box">
             <div className="metric-label">
               <span>USER-MEDIATED E2E LATENCY</span>
-              {timerRunning && <span style={{ color: "var(--crimson-400)", fontWeight: "bold" }}>● LIVE</span>}
+              {timerRunning && <span style={{ color: "var(--terracotta-400)", fontWeight: "bold" }}>● LIVE</span>}
             </div>
             <div className={`metric-value ${phase === "SUCCESS" ? "completed" : timerRunning ? "active" : ""}`}>
               {elapsedSec} s
@@ -725,7 +725,7 @@ export default function App() {
             <div style={{ maxWidth: "480px", margin: "0 auto 28px auto", textAlign: "center" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontWeight: "700", fontSize: "14px" }}>
                 <span>Confirmations</span>
-                <span className="mono" style={{ color: "var(--crimson-400)" }}>
+                <span className="mono" style={{ color: "var(--terracotta-400)" }}>
                   {currentConfirmations} / {targetConfirmations}
                 </span>
               </div>
@@ -783,7 +783,7 @@ export default function App() {
 
             {/* Proof Card */}
             <div className="proof-box">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid rgba(225,29,72,0.15)", paddingBottom: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "10px" }}>
                 <span style={{ fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
                   <Layers size={16} /> Merkle Verification Payload
                 </span>
@@ -833,7 +833,7 @@ export default function App() {
                   </div>
                   {proofResult.proof.map((sibling, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", padding: "4px 0", borderBottom: i < 7 ? "1px dashed rgba(255,255,255,0.06)" : "none" }}>
-                      <span className="mono" style={{ color: "var(--crimson-400)" }}>[Level {i}]</span>
+                      <span className="mono" style={{ color: "var(--terracotta-400)" }}>[Level {i}]</span>
                       <span className="mono" style={{ color: "var(--text-muted)" }}>{sibling}</span>
                     </div>
                   ))}
@@ -845,7 +845,7 @@ export default function App() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
               <div>
                 {chainId !== NETWORKS.amoy.chainIdDec && (
-                  <span style={{ fontSize: "13px", color: "var(--crimson-300)" }}>
+                  <span style={{ fontSize: "13px", color: "var(--terracotta-400)" }}>
                     ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to Polygon Amoy.
                   </span>
                 )}

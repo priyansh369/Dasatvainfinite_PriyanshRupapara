@@ -27,7 +27,7 @@ export const NETWORKS: Record<string, NetworkConfig> = {
       "https://1rpc.io/sepolia",
     ],
     blockExplorerUrl: "https://sepolia.etherscan.io",
-    color: "#e11d48",
+    color: "#d9633e", // Terracotta
     icon: "🔷",
   },
   amoy: {
@@ -41,7 +41,7 @@ export const NETWORKS: Record<string, NetworkConfig> = {
       "https://polygon-amoy-bor-rpc.publicnode.com",
     ],
     blockExplorerUrl: "https://amoy.polygonscan.com",
-    color: "#8247e5",
+    color: "#af789b", // Dusty Mauve
     icon: "🟣",
   },
   localN1: {
@@ -52,7 +52,7 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     symbol: "ETH",
     rpcUrls: ["http://127.0.0.1:8545"],
     blockExplorerUrl: "",
-    color: "#e11d48",
+    color: "#d9633e", // Terracotta
     icon: "🖥️",
   },
   localN2: {
@@ -63,7 +63,7 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     symbol: "ETH",
     rpcUrls: ["http://127.0.0.1:8546"],
     blockExplorerUrl: "",
-    color: "#8247e5",
+    color: "#af789b", // Dusty Mauve
     icon: "🖥️",
   },
 };
