@@ -42,6 +42,7 @@ import {
   DEFAULT_CONTRACTS,
   COORDINATOR_CHAIN_BASELINE_SECONDS,
 } from "./config/networks";
+import MerkleTreeVisualizer from "./components/MerkleTreeVisualizer";
 
 // Global window ethereum typing
 declare global {
@@ -85,6 +86,8 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [showMerkleVisualizerModal, setShowMerkleVisualizerModal] = useState<boolean>(false);
+  const [proofTab, setProofTab] = useState<"visualizer" | "raw">("visualizer");
 
   // Custom contract overrides
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
@@ -648,6 +651,17 @@ export default function App() {
           )}
 
           <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: "8px 12px", gap: "6px" }}
+            onClick={() => setShowMerkleVisualizerModal(true)}
+            title="Open Interactive Merkle Tree Visualizer"
+          >
+            <span style={{ fontSize: "14px" }}>🌳</span>
+            <span style={{ fontSize: "12px", fontWeight: "600" }}>Tree Visualizer</span>
+          </button>
+
+          <button
             className="btn btn-secondary"
             style={{ padding: "8px 12px" }}
             onClick={() => setShowConfig(!showConfig)}
@@ -1141,65 +1155,100 @@ export default function App() {
               </div>
             </div>
 
-            {/* Proof Card */}
-            <div className="proof-box">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "10px" }}>
-                <span style={{ fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Layers size={16} /> Merkle Verification Payload
-                </span>
-                <button
-                  className="btn btn-secondary"
-                  style={{ padding: "4px 10px", fontSize: "11px" }}
-                  onClick={() => setShowProofDetails(!showProofDetails)}
-                >
-                  {showProofDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  {showProofDetails ? "Collapse Sibling Nodes" : "View 8 Sibling Nodes"}
-                </button>
-              </div>
-
-              <div className="proof-item">
-                <span className="proof-label">Merkle Root (Header):</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="proof-val">{proofResult.header.root}</span>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: "2px 6px" }}
-                    onClick={() => copyToClipboard(proofResult.header.root, "root")}
-                  >
-                    {copiedKey === "root" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="proof-item">
-                <span className="proof-label">Leaf Hash (Request Data):</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="proof-val">{submitResult.leaf}</span>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: "2px 6px" }}
-                    onClick={() => copyToClipboard(submitResult.leaf, "leaf")}
-                  >
-                    {copiedKey === "leaf" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Sibling Array Breakdown */}
-              {showProofDetails && (
-                <div style={{ marginTop: "12px", background: "rgba(0,0,0,0.4)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "8px" }}>
-                    Sibling Hashes (Depth 8 Proof Path):
-                  </div>
-                  {proofResult.proof.map((sibling, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", padding: "4px 0", borderBottom: i < 7 ? "1px dashed rgba(255,255,255,0.06)" : "none" }}>
-                      <span className="mono" style={{ color: "var(--terracotta-400)" }}>[Level {i}]</span>
-                      <span className="mono" style={{ color: "var(--text-muted)" }}>{sibling}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Tab Selector: Interactive Tree Visualizer vs Raw Payload */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+              <button
+                type="button"
+                className={`btn ${proofTab === "visualizer" ? "btn-primary" : "btn-secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px", gap: "6px" }}
+                onClick={() => setProofTab("visualizer")}
+              >
+                <span>🌳</span>
+                <span>Interactive Tree Visualizer</span>
+              </button>
+              <button
+                type="button"
+                className={`btn ${proofTab === "raw" ? "btn-primary" : "btn-secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px", gap: "6px" }}
+                onClick={() => setProofTab("raw")}
+              >
+                <Layers size={14} />
+                <span>Raw Cryptographic Payload</span>
+              </button>
             </div>
+
+            {/* Tab 1: Interactive Tree Visualizer */}
+            {proofTab === "visualizer" && (
+              <MerkleTreeVisualizer
+                root={proofResult.header.root}
+                leaf={submitResult.leaf}
+                proof={proofResult.proof}
+                requestId={submitResult.id}
+                isInline={true}
+              />
+            )}
+
+            {/* Tab 2: Raw Cryptographic Proof Card */}
+            {proofTab === "raw" && (
+              <div className="proof-box">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "10px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Layers size={16} /> Merkle Verification Payload
+                  </span>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: "4px 10px", fontSize: "11px" }}
+                    onClick={() => setShowProofDetails(!showProofDetails)}
+                  >
+                    {showProofDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    {showProofDetails ? "Collapse Sibling Nodes" : "View 8 Sibling Nodes"}
+                  </button>
+                </div>
+
+                <div className="proof-item">
+                  <span className="proof-label">Merkle Root (Header):</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="proof-val">{proofResult.header.root}</span>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: "2px 6px" }}
+                      onClick={() => copyToClipboard(proofResult.header.root, "root")}
+                    >
+                      {copiedKey === "root" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="proof-item">
+                  <span className="proof-label">Leaf Hash (Request Data):</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="proof-val">{submitResult.leaf}</span>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: "2px 6px" }}
+                      onClick={() => copyToClipboard(submitResult.leaf, "leaf")}
+                    >
+                      {copiedKey === "leaf" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sibling Array Breakdown */}
+                {showProofDetails && (
+                  <div style={{ marginTop: "12px", background: "rgba(0,0,0,0.4)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", marginBottom: "8px" }}>
+                      Sibling Hashes (Depth 8 Proof Path):
+                    </div>
+                    {proofResult.proof.map((sibling, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", padding: "4px 0", borderBottom: i < 7 ? "1px dashed rgba(255,255,255,0.06)" : "none" }}>
+                        <span className="mono" style={{ color: "var(--terracotta-400)" }}>[Level {i}]</span>
+                        <span className="mono" style={{ color: "var(--text-muted)" }}>{sibling}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Action Bar: Network Switch / Submit */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
@@ -1370,6 +1419,37 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ── Standalone Merkle Tree Visualizer Modal ───────────────────────────── */}
+      {showMerkleVisualizerModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.78)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+          }}
+          onClick={() => setShowMerkleVisualizerModal(false)}
+        >
+          <div
+            style={{ maxWidth: "860px", width: "100%", maxHeight: "90vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MerkleTreeVisualizer
+              root={proofResult?.header.root}
+              leaf={submitResult?.leaf}
+              proof={proofResult?.proof}
+              requestId={submitResult?.id}
+              onClose={() => setShowMerkleVisualizerModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
