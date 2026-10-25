@@ -20,7 +20,7 @@ interface MerkleTreeVisualizerProps {
   root?: string;
   leaf?: string;
   proof?: string[];
-  requestId?: bigint | number;
+  requestId?: bigint | number | string;
   onClose?: () => void;
   isInline?: boolean;
   autoAnimate?: boolean;

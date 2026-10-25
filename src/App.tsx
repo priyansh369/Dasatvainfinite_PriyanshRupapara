@@ -23,6 +23,7 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  History,
 } from "lucide-react";
 
 import {
@@ -44,6 +45,13 @@ import {
   getChainInfo,
 } from "./config/networks";
 import MerkleTreeVisualizer from "./components/MerkleTreeVisualizer";
+import TransactionHistoryModal from "./components/TransactionHistoryModal";
+import {
+  BridgeTransaction,
+  loadTransactions,
+  saveTransaction,
+  updateTransaction,
+} from "./types/history";
 
 // Global window ethereum typing
 declare global {
@@ -90,6 +98,9 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
+  const [activeTxId, setActiveTxId] = useState<string | null>(null);
 
   // Custom contract overrides
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
@@ -364,9 +375,45 @@ export default function App() {
       startStopwatch();
       try {
         const demo = buildDemoProof(account, recipient || account, amountEth);
+        const txId = `demo-${Date.now()}`;
+        setActiveTxId(txId);
         setSubmitResult(demo.submitResult);
         setProofResult({ proof: demo.proof, header: demo.header, request: demo.request });
         setCurrentConfirmations(1);
+
+        // Record in transaction history
+        const newTx: BridgeTransaction = {
+          id: txId,
+          timestamp: Date.now(),
+          status: "locked",
+          isDemo: true,
+          amount: amountEth,
+          token: selectedToken,
+          recipient: recipient || account,
+          sender: account,
+          sourceChain: {
+            id: chainId || 11155111,
+            name: chainInfo.name,
+            symbol: chainInfo.symbol,
+            icon: chainInfo.icon,
+          },
+          destChain: {
+            id: 80002,
+            name: "Polygon Amoy",
+            symbol: "POL",
+            icon: "🟣",
+          },
+          sourceTxHash: demo.submitResult.txHash,
+          proofData: {
+            root: demo.header.root,
+            leaf: demo.submitResult.leaf,
+            proof: demo.proof,
+            requestId: demo.submitResult.id.toString(),
+          },
+        };
+        const updatedTxs = saveTransaction(newTx);
+        setTransactions(updatedTxs);
+
         // Immediately show the live step-by-step Merkle Tree Visualizer!
         setPhase("PHASE1_PROOF");
 
@@ -424,6 +471,44 @@ export default function App() {
       // 2. Build proof off-chain using bounded block window
       const proof = await buildProof(config, sub.id, sub.blockNumber);
       setProofResult(proof);
+
+      const txId = sub.id.toString();
+      setActiveTxId(txId);
+
+      // Record in transaction history
+      const newTx: BridgeTransaction = {
+        id: txId,
+        timestamp: Date.now(),
+        status: "locked",
+        isDemo: false,
+        amount: amountEth,
+        token: selectedToken,
+        recipient,
+        sender: account,
+        sourceChain: {
+          id: chainId || 11155111,
+          name: chainInfo.name,
+          symbol: chainInfo.symbol,
+          icon: chainInfo.icon,
+        },
+        destChain: {
+          id: 80002,
+          name: "Polygon Amoy",
+          symbol: "POL",
+          icon: "🟣",
+        },
+        sourceTxHash: sub.txHash,
+        proofData: {
+          root: proof.header.root,
+          leaf: sub.leaf,
+          proof: proof.proof,
+          requestId: sub.id.toString(),
+          blockNumber: sub.blockNumber,
+        },
+      };
+      const updatedTxs = saveTransaction(newTx);
+      setTransactions(updatedTxs);
+
       // Immediately display live Merkle Tree step-by-step calculation!
       setPhase("PHASE1_PROOF");
 
@@ -464,8 +549,23 @@ export default function App() {
         setVerifyTxHash(fakeAmoyTx);
         setWDemoBalance(amountEth);
         stopStopwatch();
+
+        const elapsed = startTimeRef.current ? Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1)) : 1.4;
+        if (activeTxId) {
+          const updated = updateTransaction(activeTxId, {
+            status: "minted",
+            destTxHash: fakeAmoyTx,
+            elapsedSec: elapsed,
+          });
+          setTransactions(updated);
+        }
+
         setPhase("SUCCESS");
       } catch (err: unknown) {
+        if (activeTxId) {
+          const updated = updateTransaction(activeTxId, { status: "failed" });
+          setTransactions(updated);
+        }
         setErrorMessage(err instanceof Error ? err.message : String(err));
         stopStopwatch();
         setPhase("FAILED");
@@ -516,6 +616,16 @@ export default function App() {
       setVerifyTxHash(receipt.hash);
       stopStopwatch();
 
+      const elapsed = startTimeRef.current ? Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1)) : 2.5;
+      if (activeTxId) {
+        const updated = updateTransaction(activeTxId, {
+          status: "minted",
+          destTxHash: receipt.hash,
+          elapsedSec: elapsed,
+        });
+        setTransactions(updated);
+      }
+
       // Read updated wDEMO balance
       try {
         const wDemo = new ethers.Contract(wrappedDemoAddress, WRAPPED_DEMO_ABI, browserProvider);
@@ -528,6 +638,10 @@ export default function App() {
 
       setPhase("SUCCESS");
     } catch (err: unknown) {
+      if (activeTxId) {
+        const updated = updateTransaction(activeTxId, { status: "failed" });
+        setTransactions(updated);
+      }
       setErrorMessage(err instanceof Error ? err.message : String(err));
       stopStopwatch();
       setPhase("FAILED");
@@ -572,6 +686,7 @@ export default function App() {
     setElapsedMs(0);
     setTimerRunning(false);
     startTimeRef.current = null;
+    setActiveTxId(null);
   };
 
   const logoutWallet = () => {
@@ -675,6 +790,38 @@ export default function App() {
               {isConnecting ? "Connecting..." : "Connect MetaMask"}
             </button>
           )}
+
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "8px 12px", position: "relative" }}
+            onClick={() => setShowHistory(true)}
+            title="Transaction History & Cryptographic Proof Explorer"
+          >
+            <History size={18} />
+            {transactions.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-4px",
+                  right: "-4px",
+                  background: "var(--terracotta-500)",
+                  color: "#fff",
+                  fontSize: "10px",
+                  fontWeight: "800",
+                  borderRadius: "10px",
+                  minWidth: "18px",
+                  height: "18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 4px",
+                  boxShadow: "0 0 8px rgba(216, 97, 60, 0.6)",
+                }}
+              >
+                {transactions.length}
+              </span>
+            )}
+          </button>
 
           <button
             className="btn btn-secondary"
@@ -1323,9 +1470,16 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
               <button className="btn btn-primary" onClick={resetFlow}>
                 <RotateCcw size={16} /> Execute Another Transfer
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowHistory(true)}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <History size={16} /> View in Proof Explorer
               </button>
             </div>
           </div>
@@ -1385,6 +1539,18 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ── Transaction History & Proof Explorer Modal ──────────────────────── */}
+      <TransactionHistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        transactions={transactions}
+        onTransactionsChange={setTransactions}
+        onTriggerDemo={() => {
+          setIsDemoMode(true);
+          resetFlow();
+        }}
+      />
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
