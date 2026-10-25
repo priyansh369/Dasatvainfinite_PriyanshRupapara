@@ -118,6 +118,9 @@ export default function App() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [showBenchmark, setShowBenchmark] = useState<boolean>(false);
+  const [useSelfRecipient, setUseSelfRecipient] = useState<boolean>(true);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
@@ -961,11 +964,11 @@ export default function App() {
 
       {/* ── Collapsible Configuration Drawer ─────────────────────────────────── */}
       {showConfig && (
-        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--mauve-600)", background: "rgba(18, 8, 21, 0.95)" }}>
+        <div className="benchmark-card" style={{ marginBottom: "24px", borderColor: "var(--mauve-400)", background: "#ffffff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "10px" }}>
             <div>
               <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <Settings size={18} style={{ color: "var(--terracotta-400)" }} />
+                <Settings size={18} style={{ color: "var(--terracotta-500)" }} />
                 Developer & Smart Contract Settings
               </h3>
               <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
@@ -974,7 +977,7 @@ export default function App() {
             </div>
 
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
+              <div style={{ display: "flex", background: "#f0eaf1", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
                 <button
                   type="button"
                   className={`btn ${networkMode === "testnet" ? "btn-primary" : "btn-secondary"}`}
@@ -1005,9 +1008,9 @@ export default function App() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "16px" }}>
-            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+            <div style={{ background: "#fbf9fc", padding: "14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--terracotta-300)" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--terracotta-700)" }}>
                   🔷 N1 Router Contract (Sepolia)
                 </label>
                 <span className="badge badge-sepolia" style={{ fontSize: "10px" }}>Source Chain</span>
@@ -1024,9 +1027,9 @@ export default function App() {
               />
             </div>
 
-            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+            <div style={{ background: "#fbf9fc", padding: "14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--mauve-300)" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--mauve-700)" }}>
                   🟣 N2 Verifier Contract (Amoy)
                 </label>
                 <span className="badge badge-amoy" style={{ fontSize: "10px" }}>Destination Chain</span>
@@ -1043,12 +1046,12 @@ export default function App() {
               />
             </div>
 
-            <div style={{ background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+            <div style={{ background: "#fbf9fc", padding: "14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--mauve-200)" }}>
+                <label className="input-label" style={{ marginBottom: 0, fontWeight: "700", color: "var(--plum-800)" }}>
                   🪙 WrappedDemo Token (wDEMO)
                 </label>
-                <span className="badge" style={{ fontSize: "10px", background: "rgba(255,255,255,0.08)" }}>ERC-20</span>
+                <span className="badge" style={{ fontSize: "10px", background: "rgba(176, 116, 159, 0.15)" }}>ERC-20</span>
               </div>
               <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: 1.4 }}>
                 The synthetic bridged token on Polygon Amoy minted directly to your destination recipient address.
@@ -1065,75 +1068,18 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Benchmark Stopwatch & Comparison Banner ──────────────────────────── */}
-      <div className="benchmark-card glow-terracotta">
-        <div className="benchmark-header">
-          <div className="benchmark-title">
-            <Zap size={16} style={{ color: "var(--terracotta-400)" }} />
-            End-to-End Latency vs Coordinator Baseline
-          </div>
-          {isFaster && (
-            <div className="benchmark-badge-speedup">
-              ⚡ {speedupMultiplier}x Faster than Coordinator Chain
-            </div>
-          )}
-        </div>
-
-        <div className="benchmark-metrics">
-          {/* User-Mediated Timer */}
-          <div className="metric-box">
-            <div className="metric-label">
-              <span>USER-MEDIATED E2E LATENCY</span>
-              {timerRunning && <span style={{ color: "var(--terracotta-400)", fontWeight: "bold" }}>● LIVE</span>}
-            </div>
-            <div className={`metric-value ${phase === "SUCCESS" ? "completed" : timerRunning ? "active" : ""}`}>
-              {elapsedSec} s
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-              Client proof generation + direct submission
-            </div>
-          </div>
-
-          {/* Baseline Timer */}
-          <div className="metric-box">
-            <div className="metric-label">
-              <span>COORDINATOR CHAIN BASELINE</span>
-              <span className="badge" style={{ background: "rgba(255,255,255,0.06)", fontSize: "10px" }}>Axelar / LayerZero</span>
-            </div>
-            <div className="metric-value baseline">
-              {baselineSec} s
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-              Relayer quorum polling + secondary chain finality
-            </div>
-          </div>
-        </div>
-
-        {/* Visual Progress Bar Comparing Latency */}
-        <div className="progress-bar-bg" style={{ height: "8px" }}>
-          <div
-            className="progress-bar-fill"
-            style={{
-              width: `${Math.min(100, (parseFloat(elapsedSec) / COORDINATOR_CHAIN_BASELINE_SECONDS) * 100)}%`,
-              background: phase === "SUCCESS" ? "linear-gradient(90deg, #10b981, #34d399)" : undefined,
-            }}
-          />
-        </div>
-      </div>
-
-      {/* ── MetaMask Token Portfolio Bar ───────────────────────────────────────── */}
+      {/* ── MetaMask Balance & Quick Actions Bar ──────────────────────────────── */}
       {account && (
         <div className="token-portfolio-bar">
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Wallet size={16} style={{ color: "var(--terracotta-400)" }} />
-              <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
-                MetaMask Assets:
+              <Wallet size={16} style={{ color: "var(--terracotta-500)" }} />
+              <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
+                Active Balance:
               </span>
             </div>
 
             <div className="token-list">
-              {/* Connected Active Chain Asset */}
               <div
                 className={`token-chip ${selectedToken === chainInfo.symbol ? "active" : ""}`}
                 onClick={() => setSelectedToken(chainInfo.symbol)}
@@ -1144,7 +1090,6 @@ export default function App() {
                 <span className="token-chip-balance">{connectedNativeBalance} {chainInfo.symbol}</span>
               </div>
 
-              {/* Sepolia ETH (if active network is not Sepolia) */}
               {chainId !== NETWORKS.sepolia.chainIdDec && (
                 <div
                   className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
@@ -1152,19 +1097,18 @@ export default function App() {
                   title="Sepolia ETH"
                 >
                   <span>🔷</span>
-                  <span className="token-chip-symbol">Sepolia ETH:</span>
+                  <span className="token-chip-symbol">Sepolia:</span>
                   <span className="token-chip-balance">{nativeBalance} ETH</span>
                 </div>
               )}
 
-              {/* Amoy wDEMO */}
               <div
                 className={`token-chip ${selectedToken === "wDEMO" ? "active" : ""}`}
                 onClick={() => setSelectedToken("wDEMO")}
                 title="Amoy wDEMO"
               >
                 <span>🟣</span>
-                <span className="token-chip-symbol">Amoy wDEMO:</span>
+                <span className="token-chip-symbol">Amoy:</span>
                 <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
               </div>
             </div>
@@ -1177,8 +1121,8 @@ export default function App() {
               onClick={importWDEMOToMetaMask}
               title="Add wDEMO token into your MetaMask extension"
             >
-              {tokenImported ? <Check size={13} color="#34d399" /> : <Plus size={13} />}
-              {tokenImported ? "Added to MetaMask!" : "Add wDEMO to MetaMask"}
+              {tokenImported ? <Check size={13} color="#059669" /> : <Plus size={13} />}
+              {tokenImported ? "Added to MetaMask!" : "+ Add wDEMO to MetaMask"}
             </button>
 
             <button
@@ -1195,43 +1139,141 @@ export default function App() {
         </div>
       )}
 
-      {/* ── 2-Phase Stepper Navigation ────────────────────────────────────────── */}
+      {/* ── 2-Step Pipeline Progress Indicator ─────────────────────────────────── */}
       <div className="stepper-nav">
-        {/* Step 1: Sepolia Lock */}
+        {/* Step 1: Deposit */}
         <div className={`step-card ${phase === "PHASE1_FORM" || phase === "PHASE1_CONFIRMING" || phase === "PHASE1_PROOF" ? "active" : phase === "PHASE2_SWITCH" || phase === "PHASE2_VERIFYING" || phase === "SUCCESS" ? "completed" : ""}`}>
           <div className="step-number">
             {phase === "PHASE2_SWITCH" || phase === "PHASE2_VERIFYING" || phase === "SUCCESS" ? (
-              <Check size={18} />
+              <Check size={16} />
             ) : (
               "1"
             )}
           </div>
           <div className="step-content">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="step-title">Phase 1: Sepolia Lock & Proof</div>
-              <span className="badge badge-sepolia">N1</span>
+              <div className="step-title">Step 1: Deposit & Sign</div>
+              <span className="badge badge-sepolia" style={{ fontSize: "10px" }}>Sepolia</span>
             </div>
             <div className="step-subtitle">
-              User locks native ETH into Router.sol; leaf is pushed to on-chain Merkle tree.
+              Lock funds & generate off-chain cryptographic inclusion proof.
             </div>
           </div>
         </div>
 
-        {/* Step 2: Amoy Verification */}
+        {/* Step 2: Receive */}
         <div className={`step-card ${phase === "PHASE2_SWITCH" || phase === "PHASE2_VERIFYING" ? "active" : phase === "SUCCESS" ? "completed" : ""}`}>
           <div className="step-number">
-            {phase === "SUCCESS" ? <Check size={18} /> : "2"}
+            {phase === "SUCCESS" ? <Check size={16} /> : "2"}
           </div>
           <div className="step-content">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="step-title">Phase 2: Polygon Amoy Verify</div>
-              <span className="badge badge-amoy">N2</span>
+              <div className="step-title">Step 2: Receive Payout</div>
+              <span className="badge badge-amoy" style={{ fontSize: "10px" }}>Polygon Amoy</span>
             </div>
             <div className="step-subtitle">
-              Client submits Merkle proof off-chain to Verifier.sol; mints wDEMO tokens.
+              Verify proof on-chain & mint synthetic funds directly to recipient.
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Collapsible Benchmark Drawer (User-Friendly Accordion) ──────────────── */}
+      <div style={{ marginBottom: "22px" }}>
+        <button
+          type="button"
+          onClick={() => setShowBenchmark(!showBenchmark)}
+          style={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: "#ffffff",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-md)",
+            padding: "10px 16px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: "700",
+            color: "var(--text-secondary)",
+            boxShadow: "0 2px 8px rgba(70, 30, 80, 0.03)",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Zap size={14} style={{ color: "var(--terracotta-500)" }} />
+            <span>Protocol Latency Benchmark vs Coordinator Baseline</span>
+            <span className="badge" style={{ background: "rgba(5, 150, 105, 0.1)", color: "#059669", fontSize: "10px", padding: "2px 6px" }}>
+              119.7s Baseline
+            </span>
+            {isFaster && (
+              <span className="badge" style={{ background: "rgba(216, 97, 60, 0.1)", color: "var(--terracotta-700)", fontSize: "10px", padding: "2px 6px" }}>
+                ⚡ {speedupMultiplier}x Faster
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-muted)" }}>
+            <span>{showBenchmark ? "Hide Analytics" : "View Analytics"}</span>
+            {showBenchmark ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </div>
+        </button>
+
+        {showBenchmark && (
+          <div className="benchmark-card glow-terracotta" style={{ marginTop: "10px", marginBottom: "0" }}>
+            <div className="benchmark-header">
+              <div className="benchmark-title">
+                <Zap size={16} style={{ color: "var(--terracotta-500)" }} />
+                Real-Time End-to-End Latency vs Coordinator Baseline
+              </div>
+              {isFaster && (
+                <div className="benchmark-badge-speedup">
+                  ⚡ {speedupMultiplier}x Faster than Coordinator Chain
+                </div>
+              )}
+            </div>
+
+            <div className="benchmark-metrics">
+              {/* User-Mediated Timer */}
+              <div className="metric-box">
+                <div className="metric-label">
+                  <span>USER-MEDIATED E2E LATENCY</span>
+                  {timerRunning && <span style={{ color: "var(--terracotta-500)", fontWeight: "bold" }}>● LIVE</span>}
+                </div>
+                <div className={`metric-value ${phase === "SUCCESS" ? "completed" : timerRunning ? "active" : ""}`}>
+                  {elapsedSec} s
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                  Client proof generation + direct submission
+                </div>
+              </div>
+
+              {/* Baseline Timer */}
+              <div className="metric-box">
+                <div className="metric-label">
+                  <span>COORDINATOR CHAIN BASELINE</span>
+                  <span className="badge" style={{ background: "rgba(176, 116, 159, 0.15)", fontSize: "10px" }}>Axelar / LayerZero</span>
+                </div>
+                <div className="metric-value baseline">
+                  {baselineSec} s
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                  Relayer quorum polling + secondary chain finality
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Progress Bar Comparing Latency */}
+            <div className="progress-bar-bg" style={{ height: "8px" }}>
+              <div
+                className="progress-bar-fill"
+                style={{
+                  width: `${Math.min(100, (parseFloat(elapsedSec) / COORDINATOR_CHAIN_BASELINE_SECONDS) * 100)}%`,
+                  background: phase === "SUCCESS" ? "linear-gradient(90deg, #059669, #10b981)" : undefined,
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Error Banner ──────────────────────────────────────────────────────── */}
@@ -1307,25 +1349,26 @@ export default function App() {
             )}
 
             {/* ── Crypto & Currency Exchange Engine (e.g. 1 USD = 94.95 INR) ── */}
-            <div style={{ marginBottom: "24px" }}>
+            <div style={{ marginBottom: "22px" }}>
               {/* Send Box */}
               <div
                 style={{
-                  background: "rgba(0, 0, 0, 0.35)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "#fbf9fc",
+                  border: "1px solid rgba(176, 116, 159, 0.25)",
                   borderRadius: "14px",
                   padding: "18px 20px",
                   marginBottom: "8px",
                   position: "relative",
+                  boxShadow: "0 2px 10px rgba(70, 30, 80, 0.02)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
                       You Pay / Send
                     </span>
                     <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                      (Source: {chainInfo.name})
+                      (From: {chainInfo.name})
                     </span>
                   </div>
 
@@ -1337,15 +1380,16 @@ export default function App() {
                         type="button"
                         onClick={() => setExchangeAmount(preset)}
                         style={{
-                          background: exchangeAmount === preset ? "rgba(216, 97, 60, 0.3)" : "rgba(255, 255, 255, 0.05)",
+                          background: exchangeAmount === preset ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
                           border: "1px solid",
-                          borderColor: exchangeAmount === preset ? "var(--terracotta-400)" : "rgba(255, 255, 255, 0.1)",
-                          color: exchangeAmount === preset ? "#fff" : "var(--text-muted)",
+                          borderColor: exchangeAmount === preset ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
+                          color: exchangeAmount === preset ? "var(--terracotta-700)" : "var(--text-secondary)",
                           padding: "3px 8px",
                           borderRadius: "6px",
                           fontSize: "11px",
-                          fontWeight: "600",
+                          fontWeight: "700",
                           cursor: "pointer",
+                          transition: "all 0.15s ease",
                         }}
                       >
                         {SUPPORTED_CURRENCIES[sendCurrency]?.symbol}{preset}
@@ -1355,13 +1399,13 @@ export default function App() {
                       type="button"
                       onClick={handleMax}
                       style={{
-                        background: "rgba(216, 97, 60, 0.2)",
+                        background: "rgba(216, 97, 60, 0.1)",
                         border: "1px solid var(--terracotta-500)",
-                        color: "var(--terracotta-300)",
+                        color: "var(--terracotta-700)",
                         padding: "3px 8px",
                         borderRadius: "6px",
                         fontSize: "11px",
-                        fontWeight: "700",
+                        fontWeight: "800",
                         cursor: "pointer",
                       }}
                     >
@@ -1383,9 +1427,9 @@ export default function App() {
                         background: "transparent",
                         border: "none",
                         outline: "none",
-                        fontSize: "30px",
+                        fontSize: "32px",
                         fontWeight: "800",
-                        color: "#f8fafc",
+                        color: "var(--text-primary)",
                         fontFamily: "var(--font-mono)",
                         width: "100%",
                       }}
@@ -1403,16 +1447,16 @@ export default function App() {
                           display: "flex",
                           alignItems: "center",
                           gap: "5px",
-                          padding: "6px 10px",
+                          padding: "6px 11px",
                           borderRadius: "8px",
                           fontSize: "13px",
                           fontWeight: "700",
                           cursor: "pointer",
                           border: "1px solid",
-                          borderColor: sendCurrency === c.code ? "var(--terracotta-400)" : "rgba(255, 255, 255, 0.1)",
-                          background: sendCurrency === c.code ? "rgba(216, 97, 60, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                          color: sendCurrency === c.code ? "#fff" : "var(--text-secondary)",
-                          transition: "all 0.15s",
+                          borderColor: sendCurrency === c.code ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
+                          background: sendCurrency === c.code ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
+                          color: sendCurrency === c.code ? "var(--terracotta-700)" : "var(--text-secondary)",
+                          transition: "all 0.15s ease",
                         }}
                       >
                         <span>{c.icon}</span>
@@ -1434,13 +1478,13 @@ export default function App() {
                     height: "38px",
                     borderRadius: "50%",
                     background: "linear-gradient(135deg, #d8613c, #b0749f)",
-                    border: "3px solid #160b1c",
+                    border: "3px solid #ffffff",
                     color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(216, 97, 60, 0.4)",
+                    boxShadow: "0 4px 14px rgba(216, 97, 60, 0.25)",
                     transition: "transform 0.2s ease",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.transform = "rotate(180deg)")}
@@ -1453,18 +1497,19 @@ export default function App() {
               {/* Receive Box */}
               <div
                 style={{
-                  background: "rgba(0, 0, 0, 0.35)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "#fbf9fc",
+                  border: "1px solid rgba(176, 116, 159, 0.25)",
                   borderRadius: "14px",
                   padding: "18px 20px",
                   marginTop: "8px",
+                  boxShadow: "0 2px 10px rgba(70, 30, 80, 0.02)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--mauve-200)" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
                     You Receive (Calculated Payout)
                   </span>
-                  <span style={{ fontSize: "11px", color: "#34d399", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "4px" }}>
                     <TrendingUp size={12} /> Guaranteed Rate
                   </span>
                 </div>
@@ -1472,9 +1517,9 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
                   <div
                     style={{
-                      fontSize: "30px",
+                      fontSize: "32px",
                       fontWeight: "800",
-                      color: "#34d399",
+                      color: "#059669",
                       fontFamily: "var(--font-mono)",
                       letterSpacing: "-0.5px",
                     }}
@@ -1493,16 +1538,16 @@ export default function App() {
                           display: "flex",
                           alignItems: "center",
                           gap: "5px",
-                          padding: "6px 10px",
+                          padding: "6px 11px",
                           borderRadius: "8px",
                           fontSize: "13px",
                           fontWeight: "700",
                           cursor: "pointer",
                           border: "1px solid",
-                          borderColor: receiveCurrency === c.code ? "#10b981" : "rgba(255, 255, 255, 0.1)",
-                          background: receiveCurrency === c.code ? "rgba(16, 185, 129, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                          color: receiveCurrency === c.code ? "#fff" : "var(--text-secondary)",
-                          transition: "all 0.15s",
+                          borderColor: receiveCurrency === c.code ? "#059669" : "rgba(176, 116, 159, 0.25)",
+                          background: receiveCurrency === c.code ? "rgba(5, 150, 105, 0.1)" : "#ffffff",
+                          color: receiveCurrency === c.code ? "#059669" : "var(--text-secondary)",
+                          transition: "all 0.15s ease",
                         }}
                       >
                         <span>{c.icon}</span>
@@ -1519,7 +1564,7 @@ export default function App() {
                   marginTop: "12px",
                   padding: "10px 16px",
                   borderRadius: "10px",
-                  background: "rgba(176, 116, 159, 0.08)",
+                  background: "#f4eff5",
                   border: "1px solid rgba(176, 116, 159, 0.2)",
                   display: "flex",
                   justifyContent: "space-between",
@@ -1530,50 +1575,108 @@ export default function App() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ color: "var(--terracotta-400)", fontWeight: "700" }}>⚡ Guaranteed Rate:</span>
-                  <span className="mono" style={{ color: "#f8fafc", fontWeight: "700" }}>
+                  <span style={{ color: "var(--terracotta-600)", fontWeight: "700" }}>⚡ Guaranteed Rate:</span>
+                  <span className="mono" style={{ color: "var(--text-primary)", fontWeight: "800" }}>
                     {exchangeRateString}
                   </span>
                 </div>
                 <div style={{ color: "var(--text-muted)" }}>
-                  Slippage: 0.0% · Zero Relayer Fee · Polygon Amoy
+                  Slippage: 0.0% · Zero Relayer Fee · Instant Polygon Finality
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-              <div className="input-group">
-                <label className="input-label">Destination Recipient Address (Amoy N2)</label>
-                <input
-                  className="input-field mono"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="0x..."
-                />
+            {/* Recipient Address (Smart Default: Connected Wallet) */}
+            <div style={{ background: "#fbf9fc", border: "1px solid rgba(176, 116, 159, 0.22)", borderRadius: "var(--radius-md)", padding: "14px 18px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>
+                  <input
+                    type="checkbox"
+                    checked={useSelfRecipient}
+                    onChange={(e) => {
+                      setUseSelfRecipient(e.target.checked);
+                      if (e.target.checked && account) {
+                        setRecipient(account);
+                      }
+                    }}
+                    style={{ accentColor: "var(--terracotta-500)", width: "16px", height: "16px", cursor: "pointer" }}
+                  />
+                  <span>Receive directly into my connected wallet ({account ? `${account.slice(0, 6)}...${account.slice(-4)}` : "Connect wallet"})</span>
+                </label>
+
+                {!useSelfRecipient && (
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                    Custom Polygon Amoy Recipient
+                  </span>
+                )}
               </div>
 
-              <div className="input-group">
-                <label className="input-label">Confirmations to Wait (Default: 3)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  className="input-field mono"
-                  value={targetConfirmations}
-                  onChange={(e) => setTargetConfirmations(parseInt(e.target.value) || 1)}
-                />
-              </div>
+              {!useSelfRecipient && (
+                <div style={{ marginTop: "10px" }}>
+                  <input
+                    className="input-field mono"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="Enter custom 0x... destination recipient address"
+                    style={{ fontSize: "13px" }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Collapsible Advanced Options (Confirmations to wait) */}
+            <div style={{ marginBottom: "20px" }}>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  color: "var(--mauve-700)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <Settings size={13} />
+                <span>Advanced Transfer Options</span>
+                {showAdvancedSettings ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+
+              {showAdvancedSettings && (
+                <div style={{ marginTop: "10px", padding: "12px 16px", background: "#fbf9fc", border: "1px solid rgba(176, 116, 159, 0.22)", borderRadius: "var(--radius-md)" }}>
+                  <label className="input-label" style={{ marginBottom: "6px" }}>
+                    Confirmations to Wait (Default: 3 blocks)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    className="input-field mono"
+                    value={targetConfirmations}
+                    onChange={(e) => setTargetConfirmations(parseInt(e.target.value) || 1)}
+                    style={{ maxWidth: "200px" }}
+                  />
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                    Number of Ethereum Sepolia block confirmations before generating client Merkle inclusion proof.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button
                 className="btn btn-primary"
                 onClick={handleLockEth}
-                disabled={isBusy || !recipient || !exchangeAmount || parseFloat(exchangeAmount) <= 0}
-                style={{ padding: "12px 24px", fontSize: "14px", fontWeight: "700" }}
+                disabled={isBusy || (!recipient && !account) || !exchangeAmount || parseFloat(exchangeAmount) <= 0}
+                style={{ padding: "14px 28px", fontSize: "15px", fontWeight: "700", width: "100%", boxShadow: "0 4px 18px var(--terracotta-glow)" }}
               >
                 <Lock size={16} />
-                {isBusy ? "Initiating Cross-Chain..." : `Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency}`}
+                {isBusy ? "Initiating Cross-Chain Transfer..." : `Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency}`}
               </button>
             </div>
           </div>
@@ -1583,7 +1686,7 @@ export default function App() {
         {(phase === "PHASE1_CONFIRMING" || phase === "PHASE1_PROOF" || phase === "PHASE2_SWITCH") && proofResult && submitResult && (
           <div>
             {/* Live Block Confirmation Banner */}
-            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 20px", marginBottom: "20px" }}>
+            <div style={{ background: "#fbf9fc", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 20px", marginBottom: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <div className="brand-icon animate-pulse-glow" style={{ width: "36px", height: "36px", fontSize: "16px" }}>
@@ -1609,7 +1712,7 @@ export default function App() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span className="mono" style={{ fontSize: "13px", fontWeight: "700", color: "var(--terracotta-400)" }}>
+                  <span className="mono" style={{ fontSize: "13px", fontWeight: "700", color: "var(--terracotta-700)" }}>
                     {currentConfirmations} / {targetConfirmations} Confirmations
                   </span>
                   <span className="badge badge-success">✓ On-Chain Lock</span>
@@ -1691,7 +1794,7 @@ export default function App() {
             <div className="success-icon">
               <CheckCircle2 size={36} />
             </div>
-            <h2 style={{ fontSize: "26px", fontWeight: "800", color: "#34d399", marginBottom: "8px" }}>
+            <h2 style={{ fontSize: "26px", fontWeight: "800", color: "#059669", marginBottom: "8px" }}>
               Cross-Chain Verification Succeeded!
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "15px", marginBottom: "24px" }}>
@@ -1701,13 +1804,13 @@ export default function App() {
             <div className="proof-box" style={{ maxWidth: "640px", margin: "0 auto 28px auto", textAlign: "left" }}>
               <div className="proof-item">
                 <span className="proof-label">Currency Exchange:</span>
-                <span className="proof-val" style={{ color: "#f8fafc", fontWeight: "bold" }}>
+                <span className="proof-val" style={{ color: "var(--text-primary)", fontWeight: "bold" }}>
                   {exchangeAmount} {sendCurrency} ➔ {receiveAmount} {receiveCurrency}
                 </span>
               </div>
               <div className="proof-item">
                 <span className="proof-label">Guaranteed Rate:</span>
-                <span className="proof-val" style={{ color: "var(--terracotta-400)", fontWeight: "bold" }}>
+                <span className="proof-val" style={{ color: "var(--terracotta-700)", fontWeight: "bold" }}>
                   {exchangeRateString}
                 </span>
               </div>
@@ -1717,7 +1820,7 @@ export default function App() {
               </div>
               <div className="proof-item">
                 <span className="proof-label">Payout Received:</span>
-                <span className="proof-val" style={{ color: "#34d399", fontWeight: "bold" }}>
+                <span className="proof-val" style={{ color: "#059669", fontWeight: "bold" }}>
                   {receiveAmount} {receiveCurrency}
                 </span>
               </div>
@@ -1749,7 +1852,7 @@ export default function App() {
               </div>
               <div className="proof-item">
                 <span className="proof-label">Total End-to-End Time:</span>
-                <span className="proof-val" style={{ color: "#34d399" }}>
+                <span className="proof-val" style={{ color: "#059669" }}>
                   {elapsedSec} s (vs 119.7 s baseline)
                 </span>
               </div>

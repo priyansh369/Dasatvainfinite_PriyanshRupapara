@@ -148,11 +148,11 @@ export default function MerkleTreeVisualizer({
     <div
       className={isInline ? "merkle-visualizer-inline" : "merkle-visualizer-modal"}
       style={{
-        background: "rgba(18, 8, 21, 0.98)",
-        border: "1px solid var(--mauve-600)",
+        background: "#ffffff",
+        border: "1px solid var(--border-subtle)",
         borderRadius: "var(--radius-lg)",
         padding: "24px",
-        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(176, 116, 159, 0.15)",
+        boxShadow: "0 10px 35px rgba(70, 30, 80, 0.06)",
         color: "var(--text-primary)",
       }}
     >
@@ -175,7 +175,7 @@ export default function MerkleTreeVisualizer({
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {/* View Mode Toggle */}
-          <div style={{ display: "flex", background: "rgba(0,0,0,0.4)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
+          <div style={{ display: "flex", background: "#f0eaf1", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
             <button
               type="button"
               className={`btn ${viewMode === "ladder" ? "btn-primary" : "btn-secondary"}`}
@@ -211,8 +211,8 @@ export default function MerkleTreeVisualizer({
       {/* ── Root Verification Badge ───────────────────────────────────────── */}
       <div
         style={{
-          background: isRootMatching ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
-          border: `1px solid ${isRootMatching ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+          background: isRootMatching ? "rgba(5, 150, 105, 0.08)" : "rgba(239, 68, 68, 0.08)",
+          border: `1px solid ${isRootMatching ? "rgba(5, 150, 105, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
           borderRadius: "var(--radius-md)",
           padding: "12px 16px",
           marginBottom: "20px",
@@ -224,9 +224,9 @@ export default function MerkleTreeVisualizer({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <ShieldCheck size={18} color={isRootMatching ? "#34d399" : "#f87171"} />
+          <ShieldCheck size={18} color={isRootMatching ? "#059669" : "#dc2626"} />
           <div>
-            <div style={{ fontSize: "12px", fontWeight: "700", color: isRootMatching ? "#34d399" : "#f87171" }}>
+            <div style={{ fontSize: "12px", fontWeight: "700", color: isRootMatching ? "#059669" : "#dc2626" }}>
               {isRootMatching ? "Cryptographic Root Matches On-Chain Router" : "Root Divergence Detected"}
             </div>
             <div className="mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -241,7 +241,7 @@ export default function MerkleTreeVisualizer({
           style={{ padding: "3px 8px", fontSize: "11px" }}
           onClick={() => copyToClipboard(targetRoot, "root")}
         >
-          {copiedKey === "root" ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+          {copiedKey === "root" ? <Check size={12} color="#059669" /> : <Copy size={12} />}
           Copy Root
         </button>
       </div>
@@ -260,10 +260,10 @@ export default function MerkleTreeVisualizer({
                   background: activeStep === idx
                     ? "var(--terracotta-500)"
                     : activeStep > idx
-                    ? "var(--mauve-700)"
-                    : "rgba(255, 255, 255, 0.05)",
-                  color: activeStep === idx ? "#ffffff" : "var(--text-secondary)",
-                  border: activeStep === idx ? "1px solid var(--terracotta-400)" : "1px solid var(--border-subtle)",
+                    ? "var(--mauve-500)"
+                    : "#f4eff5",
+                  color: activeStep === idx || activeStep > idx ? "#ffffff" : "var(--text-secondary)",
+                  border: activeStep === idx ? "1px solid var(--terracotta-500)" : "1px solid var(--border-subtle)",
                   borderRadius: "var(--radius-sm)",
                   padding: "8px 2px",
                   fontSize: "11px",
@@ -274,7 +274,7 @@ export default function MerkleTreeVisualizer({
                 }}
               >
                 <div>Lvl {s.level}</div>
-                <div style={{ fontSize: "9px", opacity: 0.8 }}>
+                <div style={{ fontSize: "9px", opacity: 0.85 }}>
                   {s.level === 0 ? "Leaf" : s.level === 7 ? "Root" : `Node`}
                 </div>
               </button>
@@ -284,7 +284,7 @@ export default function MerkleTreeVisualizer({
           {/* Active Level Detail Box */}
           <div
             style={{
-              background: "rgba(0, 0, 0, 0.35)",
+              background: "#fbf9fc",
               border: "1px solid var(--border-subtle)",
               borderRadius: "var(--radius-md)",
               padding: "20px",
@@ -348,10 +348,10 @@ export default function MerkleTreeVisualizer({
             </div>
 
             {/* Visual Formula Block */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", gap: "10px", alignItems: "center", background: "rgba(0,0,0,0.4)", borderRadius: "var(--radius-sm)", padding: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", gap: "10px", alignItems: "center", background: "#ffffff", border: "1px solid rgba(176, 116, 159, 0.22)", borderRadius: "var(--radius-sm)", padding: "16px", marginBottom: "16px" }}>
               {/* Left / Accumulator Node */}
-              <div style={{ background: "rgba(216, 97, 60, 0.1)", border: "1px solid var(--terracotta-500)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--terracotta-300)", marginBottom: "4px" }}>
+              <div style={{ background: "rgba(216, 97, 60, 0.08)", border: "1px solid var(--terracotta-500)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--terracotta-700)", marginBottom: "4px" }}>
                   {currentStepData.level === 0 ? "🔷 User Request Leaf" : `Level ${currentStepData.level} Accumulator`}
                 </div>
                 <div className="mono" style={{ fontSize: "11px", color: "var(--text-primary)", wordBreak: "break-all" }}>
@@ -360,13 +360,13 @@ export default function MerkleTreeVisualizer({
               </div>
 
               {/* Operator */}
-              <div style={{ fontSize: "16px", fontWeight: "900", color: "var(--mauve-300)" }}>
+              <div style={{ fontSize: "16px", fontWeight: "900", color: "var(--mauve-700)" }}>
                 ⊕
               </div>
 
               {/* Sibling Hash */}
-              <div style={{ background: "rgba(176, 116, 159, 0.1)", border: "1px solid var(--mauve-400)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--mauve-200)", marginBottom: "4px" }}>
+              <div style={{ background: "rgba(176, 116, 159, 0.1)", border: "1px solid var(--mauve-500)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--mauve-800)", marginBottom: "4px" }}>
                   🟣 Sibling Hash [Level {currentStepData.level}]
                 </div>
                 <div className="mono" style={{ fontSize: "11px", color: "var(--text-primary)", wordBreak: "break-all" }}>
@@ -375,13 +375,13 @@ export default function MerkleTreeVisualizer({
               </div>
 
               {/* Equals Arrow */}
-              <div style={{ fontSize: "16px", fontWeight: "900", color: "var(--terracotta-300)" }}>
+              <div style={{ fontSize: "16px", fontWeight: "900", color: "var(--terracotta-600)" }}>
                 ➔
               </div>
 
               {/* Computed Parent Hash */}
-              <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981", borderRadius: "var(--radius-sm)", padding: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: "#34d399", marginBottom: "4px" }}>
+              <div style={{ background: "rgba(5, 150, 105, 0.08)", border: "1px solid #059669", borderRadius: "var(--radius-sm)", padding: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "#059669", marginBottom: "4px" }}>
                   {currentStepData.level === 7 ? "👑 Merkle Root (Level 8)" : `Parent Hash [Level ${currentStepData.level + 1}]`}
                 </div>
                 <div className="mono" style={{ fontSize: "11px", color: "var(--text-primary)", wordBreak: "break-all" }}>
@@ -392,12 +392,12 @@ export default function MerkleTreeVisualizer({
 
             {/* Commutative Explanation Note */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", fontSize: "12px", color: "var(--text-muted)" }}>
-              <Info size={16} style={{ color: "var(--mauve-300)", flexShrink: 0, marginTop: "2px" }} />
+              <Info size={16} style={{ color: "var(--mauve-600)", flexShrink: 0, marginTop: "2px" }} />
               <div>
                 <strong>OpenZeppelin Commutative Keccak-256:</strong> In OpenZeppelin <code>MerkleTree.sol</code>, nodes are sorted as unsigned big-endian 256-bit integers before hashing:{" "}
                 <code>keccak256(concat(min(a, b), max(a, b)))</code>.
                 In this step,{" "}
-                <span className="mono" style={{ color: "var(--terracotta-300)" }}>
+                <span className="mono" style={{ color: "var(--terracotta-700)", fontWeight: "700" }}>
                   {currentStepData.isCurrentLo ? "Accumulator < Sibling (Accumulator placed first)" : "Sibling < Accumulator (Sibling placed first)"}
                 </span>.
               </div>
@@ -408,21 +408,21 @@ export default function MerkleTreeVisualizer({
 
       {/* ── View 2: Tree Hierarchy Graphic View ───────────────────────────── */}
       {viewMode === "tree" && (
-        <div style={{ background: "rgba(0,0,0,0.35)", borderRadius: "var(--radius-md)", padding: "20px", marginBottom: "20px" }}>
+        <div style={{ background: "#fbf9fc", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "20px", marginBottom: "20px" }}>
           <div style={{ textAlign: "center", marginBottom: "16px", fontSize: "13px", color: "var(--text-muted)" }}>
             Visualizing the binary proof branch from your leaf through depth 8 up to the single Merkle Root.
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
             {/* Top Root */}
-            <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "2px solid #10b981", borderRadius: "var(--radius-sm)", padding: "10px 20px", textAlign: "center", minWidth: "320px", boxShadow: "0 0 15px rgba(16, 185, 129, 0.2)" }}>
-              <div style={{ fontSize: "12px", fontWeight: "800", color: "#34d399" }}>👑 Merkle Root (Level 8)</div>
+            <div style={{ background: "rgba(5, 150, 105, 0.1)", border: "2px solid #059669", borderRadius: "var(--radius-sm)", padding: "10px 20px", textAlign: "center", minWidth: "320px", boxShadow: "0 0 15px rgba(5, 150, 105, 0.15)" }}>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: "#059669" }}>👑 Merkle Root (Level 8)</div>
               <div className="mono" style={{ fontSize: "11px", color: "var(--text-primary)" }}>
                 {targetRoot.slice(0, 14)}...{targetRoot.slice(-10)}
               </div>
             </div>
 
-            <ArrowUp size={16} color="var(--mauve-400)" />
+            <ArrowUp size={16} color="var(--mauve-600)" />
 
             {/* Tree Branch Levels (Descending from 7 to 0) */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "620px" }}>
@@ -437,8 +437,8 @@ export default function MerkleTreeVisualizer({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    background: activeStep === s.level ? "rgba(216, 97, 60, 0.2)" : "rgba(255,255,255,0.03)",
-                    border: activeStep === s.level ? "1px solid var(--terracotta-400)" : "1px solid var(--border-subtle)",
+                    background: activeStep === s.level ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
+                    border: activeStep === s.level ? "1px solid var(--terracotta-500)" : "1px solid var(--border-subtle)",
                     borderRadius: "var(--radius-sm)",
                     padding: "8px 14px",
                     cursor: "pointer",
@@ -446,7 +446,7 @@ export default function MerkleTreeVisualizer({
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span className="mono" style={{ fontSize: "11px", color: "var(--terracotta-400)", fontWeight: "700" }}>
+                    <span className="mono" style={{ fontSize: "11px", color: "var(--terracotta-700)", fontWeight: "700" }}>
                       Level {s.level}
                     </span>
                     <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -456,8 +456,8 @@ export default function MerkleTreeVisualizer({
 
                   <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mauve-400)" }} />
-                      <span className="mono" style={{ fontSize: "11px", color: "var(--mauve-200)" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mauve-500)" }} />
+                      <span className="mono" style={{ fontSize: "11px", color: "var(--mauve-700)" }}>
                         Sibling: {s.sibling.slice(0, 8)}...{s.sibling.slice(-6)}
                       </span>
                     </div>

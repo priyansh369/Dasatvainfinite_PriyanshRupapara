@@ -138,9 +138,9 @@ export default function TransactionHistoryModal({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(18, 8, 21, 0.85)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
+        backgroundColor: "rgba(28, 11, 32, 0.45)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -155,12 +155,12 @@ export default function TransactionHistoryModal({
           width: "100%",
           maxWidth: "880px",
           maxHeight: "90vh",
-          backgroundColor: "#160b1c",
-          border: "1px solid rgba(216, 97, 60, 0.3)",
+          backgroundColor: "#ffffff",
+          border: "1px solid rgba(176, 116, 159, 0.25)",
           borderRadius: "18px",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 24px 70px rgba(0, 0, 0, 0.7), 0 0 40px rgba(176, 116, 159, 0.15)",
+          boxShadow: "0 24px 70px rgba(70, 30, 80, 0.15)",
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -169,11 +169,11 @@ export default function TransactionHistoryModal({
         <div
           style={{
             padding: "20px 24px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            borderBottom: "1px solid rgba(176, 116, 159, 0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "linear-gradient(90deg, rgba(176, 116, 159, 0.12), rgba(216, 97, 60, 0.08))",
+            background: "linear-gradient(90deg, #faf5f9, #fbf7f6)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -182,19 +182,19 @@ export default function TransactionHistoryModal({
                 width: "42px",
                 height: "42px",
                 borderRadius: "12px",
-                background: "linear-gradient(135deg, rgba(176, 116, 159, 0.3), rgba(216, 97, 60, 0.3))",
-                border: "1px solid rgba(216, 97, 60, 0.4)",
+                background: "linear-gradient(135deg, rgba(176, 116, 159, 0.15), rgba(216, 97, 60, 0.15))",
+                border: "1px solid rgba(216, 97, 60, 0.3)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--terracotta-400)",
+                color: "var(--terracotta-600)",
               }}
             >
               <History size={22} />
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <h2 style={{ fontSize: "19px", fontWeight: "800", color: "#f8fafc", margin: 0 }}>
+                <h2 style={{ fontSize: "19px", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>
                   Cross-Chain History & Proof Explorer
                 </h2>
                 <span
@@ -203,8 +203,8 @@ export default function TransactionHistoryModal({
                     fontWeight: "700",
                     padding: "3px 8px",
                     borderRadius: "10px",
-                    background: "rgba(176, 116, 159, 0.2)",
-                    color: "var(--mauve-200)",
+                    background: "rgba(176, 116, 159, 0.15)",
+                    color: "var(--plum-800)",
                     border: "1px solid rgba(176, 116, 159, 0.3)",
                   }}
                 >
@@ -223,13 +223,13 @@ export default function TransactionHistoryModal({
                 onClick={handleExportAll}
                 title="Export all transactions as JSON"
                 style={{
-                  background: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  background: "#f4eff5",
+                  border: "1px solid rgba(176, 116, 159, 0.25)",
                   color: "var(--text-secondary)",
                   borderRadius: "8px",
                   padding: "8px 12px",
                   fontSize: "12px",
-                  fontWeight: "600",
+                  fontWeight: "700",
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",
@@ -244,9 +244,9 @@ export default function TransactionHistoryModal({
             <button
               onClick={onClose}
               style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                color: "#e2e8f0",
+                background: "#f4eff5",
+                border: "1px solid rgba(176, 116, 159, 0.25)",
+                color: "var(--text-primary)",
                 borderRadius: "8px",
                 width: "36px",
                 height: "36px",
@@ -265,13 +265,13 @@ export default function TransactionHistoryModal({
         <div
           style={{
             padding: "16px 24px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            borderBottom: "1px solid rgba(176, 116, 159, 0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "12px",
-            background: "rgba(0, 0, 0, 0.25)",
+            background: "#fbf9fc",
           }}
         >
           {/* Filter Chips */}
@@ -282,12 +282,12 @@ export default function TransactionHistoryModal({
                 padding: "6px 14px",
                 borderRadius: "8px",
                 fontSize: "13px",
-                fontWeight: "600",
+                fontWeight: "700",
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: filterTab === "all" ? "var(--terracotta-500)" : "rgba(255, 255, 255, 0.08)",
-                background: filterTab === "all" ? "rgba(216, 97, 60, 0.2)" : "transparent",
-                color: filterTab === "all" ? "#fff" : "var(--text-muted)",
+                borderColor: filterTab === "all" ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
+                background: filterTab === "all" ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
+                color: filterTab === "all" ? "var(--terracotta-700)" : "var(--text-secondary)",
               }}
             >
               All ({counts.all})
@@ -298,12 +298,12 @@ export default function TransactionHistoryModal({
                 padding: "6px 14px",
                 borderRadius: "8px",
                 fontSize: "13px",
-                fontWeight: "600",
+                fontWeight: "700",
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: filterTab === "minted" ? "#10b981" : "rgba(255, 255, 255, 0.08)",
-                background: filterTab === "minted" ? "rgba(16, 185, 129, 0.18)" : "transparent",
-                color: filterTab === "minted" ? "#34d399" : "var(--text-muted)",
+                borderColor: filterTab === "minted" ? "#059669" : "rgba(176, 116, 159, 0.25)",
+                background: filterTab === "minted" ? "rgba(5, 150, 105, 0.1)" : "#ffffff",
+                color: filterTab === "minted" ? "#059669" : "var(--text-secondary)",
               }}
             >
               ✓ Minted ({counts.minted})
@@ -314,12 +314,12 @@ export default function TransactionHistoryModal({
                 padding: "6px 14px",
                 borderRadius: "8px",
                 fontSize: "13px",
-                fontWeight: "600",
+                fontWeight: "700",
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: filterTab === "locked" ? "#f59e0b" : "rgba(255, 255, 255, 0.08)",
-                background: filterTab === "locked" ? "rgba(245, 158, 11, 0.18)" : "transparent",
-                color: filterTab === "locked" ? "#fbbf24" : "var(--text-muted)",
+                borderColor: filterTab === "locked" ? "#d97706" : "rgba(176, 116, 159, 0.25)",
+                background: filterTab === "locked" ? "rgba(217, 119, 6, 0.1)" : "#ffffff",
+                color: filterTab === "locked" ? "#d97706" : "var(--text-secondary)",
               }}
             >
               ⏳ Locked ({counts.locked})
@@ -330,12 +330,12 @@ export default function TransactionHistoryModal({
                 padding: "6px 14px",
                 borderRadius: "8px",
                 fontSize: "13px",
-                fontWeight: "600",
+                fontWeight: "700",
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: filterTab === "demo" ? "var(--mauve-400)" : "rgba(255, 255, 255, 0.08)",
-                background: filterTab === "demo" ? "rgba(176, 116, 159, 0.2)" : "transparent",
-                color: filterTab === "demo" ? "var(--mauve-200)" : "var(--text-muted)",
+                borderColor: filterTab === "demo" ? "var(--mauve-500)" : "rgba(176, 116, 159, 0.25)",
+                background: filterTab === "demo" ? "rgba(176, 116, 159, 0.12)" : "#ffffff",
+                color: filterTab === "demo" ? "var(--plum-800)" : "var(--text-secondary)",
               }}
             >
               ⚡ Demo / Zero-Gas ({counts.demo})
@@ -349,8 +349,8 @@ export default function TransactionHistoryModal({
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                background: "#ffffff",
+                border: "1px solid rgba(176, 116, 159, 0.25)",
                 borderRadius: "8px",
                 padding: "6px 12px",
                 width: "100%",
@@ -367,7 +367,7 @@ export default function TransactionHistoryModal({
                   background: "transparent",
                   border: "none",
                   outline: "none",
-                  color: "#f8fafc",
+                  color: "var(--text-primary)",
                   fontSize: "13px",
                   width: "100%",
                 }}
@@ -389,9 +389,9 @@ export default function TransactionHistoryModal({
                     onClick={() => setShowConfirmClear(true)}
                     title="Clear history"
                     style={{
-                      background: "rgba(239, 68, 68, 0.1)",
+                      background: "rgba(239, 68, 68, 0.08)",
                       border: "1px solid rgba(239, 68, 68, 0.25)",
-                      color: "#f87171",
+                      color: "#dc2626",
                       borderRadius: "8px",
                       padding: "6px 10px",
                       fontSize: "12px",
@@ -399,6 +399,7 @@ export default function TransactionHistoryModal({
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
+                      fontWeight: "700",
                     }}
                   >
                     <Trash2 size={13} /> Clear
@@ -408,7 +409,7 @@ export default function TransactionHistoryModal({
                     <button
                       onClick={handleClearAll}
                       style={{
-                        background: "#ef4444",
+                        background: "#dc2626",
                         border: "none",
                         color: "#fff",
                         borderRadius: "6px",
@@ -423,13 +424,14 @@ export default function TransactionHistoryModal({
                     <button
                       onClick={() => setShowConfirmClear(false)}
                       style={{
-                        background: "rgba(255, 255, 255, 0.1)",
-                        border: "none",
-                        color: "#fff",
+                        background: "#f4eff5",
+                        border: "1px solid rgba(176, 116, 159, 0.25)",
+                        color: "var(--text-primary)",
                         borderRadius: "6px",
                         padding: "6px 10px",
                         fontSize: "12px",
                         cursor: "pointer",
+                        fontWeight: "600",
                       }}
                     >
                       Cancel
@@ -519,10 +521,11 @@ export default function TransactionHistoryModal({
                 <div
                   key={tx.id}
                   style={{
-                    backgroundColor: "rgba(255, 255, 255, 0.025)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid rgba(176, 116, 159, 0.22)",
                     borderRadius: "14px",
                     padding: "18px 20px",
+                    boxShadow: "0 2px 10px rgba(70, 30, 80, 0.03)",
                     transition: "border-color 0.2s, background-color 0.2s",
                   }}
                 >
@@ -544,14 +547,14 @@ export default function TransactionHistoryModal({
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
-                          background: "rgba(0, 0, 0, 0.35)",
+                          background: "#f4eff5",
                           padding: "6px 10px",
                           borderRadius: "8px",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                          border: "1px solid rgba(176, 116, 159, 0.25)",
                         }}
                       >
                         <span style={{ fontSize: "14px" }}>{tx.sourceChain?.icon || "🔷"}</span>
-                        <span style={{ fontSize: "13px", fontWeight: "700", color: "#f8fafc" }}>
+                        <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>
                           {tx.amount} {tx.token}
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -559,7 +562,7 @@ export default function TransactionHistoryModal({
                         </span>
                       </div>
 
-                      <div style={{ color: "var(--terracotta-400)", display: "flex", alignItems: "center" }}>
+                      <div style={{ color: "var(--terracotta-500)", display: "flex", alignItems: "center" }}>
                         <ArrowRight size={16} />
                       </div>
 
@@ -568,14 +571,14 @@ export default function TransactionHistoryModal({
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
-                          background: "rgba(130, 71, 229, 0.12)",
+                          background: "rgba(176, 116, 159, 0.12)",
                           padding: "6px 10px",
                           borderRadius: "8px",
-                          border: "1px solid rgba(130, 71, 229, 0.3)",
+                          border: "1px solid rgba(176, 116, 159, 0.3)",
                         }}
                       >
                         <span style={{ fontSize: "14px" }}>{tx.destChain?.icon || "🟣"}</span>
-                        <span style={{ fontSize: "13px", fontWeight: "700", color: "#c084fc" }}>
+                        <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--plum-800)" }}>
                           {tx.receiveAmount || tx.amount} {tx.receiveToken || "wDEMO"}
                         </span>
                         <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -589,10 +592,10 @@ export default function TransactionHistoryModal({
                             fontSize: "11px",
                             padding: "3px 8px",
                             borderRadius: "6px",
-                            background: "rgba(216, 97, 60, 0.15)",
-                            color: "var(--terracotta-300)",
+                            background: "rgba(216, 97, 60, 0.1)",
+                            color: "var(--terracotta-700)",
                             border: "1px solid rgba(216, 97, 60, 0.25)",
-                            fontWeight: "600",
+                            fontWeight: "700",
                           }}
                         >
                           Rate: {tx.exchangeRate}
@@ -609,9 +612,9 @@ export default function TransactionHistoryModal({
                             fontWeight: "700",
                             padding: "3px 8px",
                             borderRadius: "6px",
-                            background: "rgba(176, 116, 159, 0.2)",
-                            color: "var(--mauve-200)",
-                            border: "1px solid rgba(176, 116, 159, 0.35)",
+                            background: "rgba(176, 116, 159, 0.15)",
+                            color: "var(--plum-800)",
+                            border: "1px solid rgba(176, 116, 159, 0.3)",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "4px",
@@ -628,9 +631,9 @@ export default function TransactionHistoryModal({
                             fontWeight: "700",
                             padding: "3px 8px",
                             borderRadius: "6px",
-                            background: "rgba(16, 185, 129, 0.15)",
-                            color: "#34d399",
-                            border: "1px solid rgba(16, 185, 129, 0.35)",
+                            background: "rgba(5, 150, 105, 0.1)",
+                            color: "#059669",
+                            border: "1px solid rgba(5, 150, 105, 0.3)",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "4px",
@@ -645,9 +648,9 @@ export default function TransactionHistoryModal({
                             fontWeight: "700",
                             padding: "3px 8px",
                             borderRadius: "6px",
-                            background: "rgba(245, 158, 11, 0.15)",
-                            color: "#fbbf24",
-                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            background: "rgba(217, 119, 6, 0.1)",
+                            color: "#d97706",
+                            border: "1px solid rgba(217, 119, 6, 0.3)",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "4px",
@@ -662,9 +665,9 @@ export default function TransactionHistoryModal({
                             fontWeight: "700",
                             padding: "3px 8px",
                             borderRadius: "6px",
-                            background: "rgba(239, 68, 68, 0.15)",
-                            color: "#f87171",
-                            border: "1px solid rgba(239, 68, 68, 0.35)",
+                            background: "rgba(239, 68, 68, 0.1)",
+                            color: "#dc2626",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "4px",
@@ -683,7 +686,8 @@ export default function TransactionHistoryModal({
                   {/* Middle Row: Hashes, Recipient, Benchmark */}
                   <div
                     style={{
-                      background: "rgba(0, 0, 0, 0.22)",
+                      background: "#fbf9fc",
+                      border: "1px solid rgba(176, 116, 159, 0.18)",
                       borderRadius: "10px",
                       padding: "10px 14px",
                       display: "grid",
@@ -697,7 +701,7 @@ export default function TransactionHistoryModal({
                         Recipient Address:
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span className="mono" style={{ color: "#e2e8f0", fontWeight: "600" }}>
+                        <span className="mono" style={{ color: "var(--text-primary)", fontWeight: "700" }}>
                           {truncateAddress(tx.recipient)}
                         </span>
                         <button
@@ -705,7 +709,7 @@ export default function TransactionHistoryModal({
                           style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0 }}
                           title="Copy address"
                         >
-                          {copiedKey === `recip-${tx.id}` ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                          {copiedKey === `recip-${tx.id}` ? <Check size={12} color="#059669" /> : <Copy size={12} />}
                         </button>
                       </div>
                     </div>
@@ -716,7 +720,7 @@ export default function TransactionHistoryModal({
                       </span>
                       {tx.sourceTxHash ? (
                         tx.isDemo ? (
-                          <span className="mono" style={{ color: "var(--mauve-300)" }}>
+                          <span className="mono" style={{ color: "var(--mauve-700)" }}>
                             {truncateAddress(tx.sourceTxHash)} (Simulated)
                           </span>
                         ) : (
@@ -725,12 +729,13 @@ export default function TransactionHistoryModal({
                             target="_blank"
                             rel="noreferrer"
                             style={{
-                              color: "var(--terracotta-400)",
+                              color: "var(--terracotta-600)",
                               display: "inline-flex",
                               alignItems: "center",
                               gap: "4px",
                               textDecoration: "none",
                               fontFamily: "var(--font-mono)",
+                              fontWeight: "600",
                             }}
                           >
                             {truncateAddress(tx.sourceTxHash)}
@@ -748,7 +753,7 @@ export default function TransactionHistoryModal({
                       </span>
                       {tx.destTxHash ? (
                         tx.isDemo ? (
-                          <span className="mono" style={{ color: "var(--mauve-300)" }}>
+                          <span className="mono" style={{ color: "var(--mauve-700)" }}>
                             {truncateAddress(tx.destTxHash)} (Simulated)
                           </span>
                         ) : (
@@ -757,12 +762,13 @@ export default function TransactionHistoryModal({
                             target="_blank"
                             rel="noreferrer"
                             style={{
-                              color: "#c084fc",
+                              color: "var(--plum-700)",
                               display: "inline-flex",
                               alignItems: "center",
                               gap: "4px",
                               textDecoration: "none",
                               fontFamily: "var(--font-mono)",
+                              fontWeight: "600",
                             }}
                           >
                             {truncateAddress(tx.destTxHash)}
@@ -779,7 +785,7 @@ export default function TransactionHistoryModal({
                         Verification Latency:
                       </span>
                       {tx.elapsedSec ? (
-                        <span style={{ color: "#34d399", fontWeight: "700" }}>
+                        <span style={{ color: "#059669", fontWeight: "700" }}>
                           ⚡ {tx.elapsedSec}s{" "}
                           <span style={{ color: "var(--text-muted)", fontWeight: "400", fontSize: "11px" }}>
                             (vs 119.7s relayers)
@@ -807,14 +813,14 @@ export default function TransactionHistoryModal({
                         <button
                           onClick={() => setExpandedProofTxId(isProofExpanded ? null : tx.id)}
                           style={{
-                            background: isProofExpanded ? "rgba(216, 97, 60, 0.25)" : "rgba(255, 255, 255, 0.05)",
+                            background: isProofExpanded ? "rgba(216, 97, 60, 0.15)" : "#f4eff5",
                             border: "1px solid",
-                            borderColor: isProofExpanded ? "var(--terracotta-500)" : "rgba(255, 255, 255, 0.1)",
-                            color: isProofExpanded ? "#fff" : "var(--text-secondary)",
+                            borderColor: isProofExpanded ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
+                            color: isProofExpanded ? "var(--terracotta-700)" : "var(--text-primary)",
                             borderRadius: "8px",
                             padding: "6px 12px",
                             fontSize: "12px",
-                            fontWeight: "600",
+                            fontWeight: "700",
                             cursor: "pointer",
                             display: "inline-flex",
                             alignItems: "center",
@@ -822,7 +828,7 @@ export default function TransactionHistoryModal({
                             transition: "all 0.2s",
                           }}
                         >
-                          <ShieldCheck size={14} color="var(--terracotta-400)" />
+                          <ShieldCheck size={14} color="var(--terracotta-500)" />
                           {isProofExpanded ? "Hide Merkle Visualizer" : "Inspect 8-Depth Proof"}
                           {isProofExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </button>
@@ -831,13 +837,13 @@ export default function TransactionHistoryModal({
                       <button
                         onClick={() => exportProofToJson(tx)}
                         style={{
-                          background: "rgba(255, 255, 255, 0.05)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          background: "#f4eff5",
+                          border: "1px solid rgba(176, 116, 159, 0.25)",
                           color: "var(--text-secondary)",
                           borderRadius: "8px",
                           padding: "6px 12px",
                           fontSize: "12px",
-                          fontWeight: "600",
+                          fontWeight: "700",
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
@@ -864,7 +870,7 @@ export default function TransactionHistoryModal({
                             gap: "4px",
                           }}
                         >
-                          {copiedKey === `root-${tx.id}` ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                          {copiedKey === `root-${tx.id}` ? <Check size={12} color="#059669" /> : <Copy size={12} />}
                           Root: {tx.proofData.root.slice(0, 8)}...
                         </button>
                       </div>
@@ -877,7 +883,7 @@ export default function TransactionHistoryModal({
                       style={{
                         marginTop: "16px",
                         paddingTop: "16px",
-                        borderTop: "1px dashed rgba(255, 255, 255, 0.1)",
+                        borderTop: "1px dashed rgba(176, 116, 159, 0.3)",
                       }}
                     >
                       <MerkleTreeVisualizer
@@ -900,8 +906,8 @@ export default function TransactionHistoryModal({
         <div
           style={{
             padding: "12px 24px",
-            borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-            background: "rgba(0, 0, 0, 0.35)",
+            borderTop: "1px solid rgba(176, 116, 159, 0.2)",
+            background: "#fbf9fc",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
