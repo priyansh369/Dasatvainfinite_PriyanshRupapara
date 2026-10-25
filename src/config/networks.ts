@@ -81,3 +81,27 @@ export const DEFAULT_CONTRACTS = {
 };
 
 export const COORDINATOR_CHAIN_BASELINE_SECONDS = 119.7;
+
+/** Comprehensive EVM chain lookup map for MetaMask network synchronization */
+export const KNOWN_CHAINS: Record<number, { name: string; symbol: string; icon: string; color: string; isPolygon?: boolean; isEthereum?: boolean }> = {
+  1: { name: "Ethereum Mainnet", symbol: "ETH", icon: "🔷", color: "#627eea", isEthereum: true },
+  11155111: { name: "Ethereum Sepolia", symbol: "ETH", icon: "🔷", color: "#d9633e", isEthereum: true },
+  17000: { name: "Ethereum Holesky", symbol: "ETH", icon: "🔷", color: "#627eea", isEthereum: true },
+  137: { name: "Polygon Mainnet", symbol: "POL", icon: "🟣", color: "#8247e5", isPolygon: true },
+  80002: { name: "Polygon Amoy", symbol: "POL", icon: "🟣", color: "#af789b", isPolygon: true },
+  80001: { name: "Polygon Mumbai", symbol: "MATIC", icon: "🟣", color: "#8247e5", isPolygon: true },
+  1101: { name: "Polygon zkEVM", symbol: "ETH", icon: "🟣", color: "#8247e5", isPolygon: true },
+  42161: { name: "Arbitrum One", symbol: "ETH", icon: "🔵", color: "#28a0f0" },
+  10: { name: "Optimism", symbol: "ETH", icon: "🔴", color: "#ff0420" },
+  8453: { name: "Base", symbol: "ETH", icon: "🔵", color: "#0052ff" },
+  56: { name: "BNB Smart Chain", symbol: "BNB", icon: "🟡", color: "#f0b90b" },
+  43114: { name: "Avalanche C-Chain", symbol: "AVAX", icon: "🔺", color: "#e84142" },
+  31337: { name: "Hardhat Localhost", symbol: "ETH", icon: "🖥️", color: "#af789b" },
+};
+
+export function getChainInfo(chainId: number | null): { name: string; symbol: string; icon: string; color: string; isPolygon: boolean; isEthereum: boolean } {
+  if (!chainId) return { name: "Not Connected", symbol: "ETH", icon: "⚡", color: "#999", isPolygon: false, isEthereum: false };
+  const known = KNOWN_CHAINS[chainId];
+  if (known) return { ...known, isPolygon: !!known.isPolygon, isEthereum: !!known.isEthereum };
+  return { name: `Chain #${chainId}`, symbol: "ETH", icon: "⛓️", color: "#af789b", isPolygon: false, isEthereum: false };
+}

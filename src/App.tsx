@@ -41,6 +41,7 @@ import {
   NETWORKS,
   DEFAULT_CONTRACTS,
   COORDINATOR_CHAIN_BASELINE_SECONDS,
+  getChainInfo,
 } from "./config/networks";
 import MerkleTreeVisualizer from "./components/MerkleTreeVisualizer";
 
@@ -59,6 +60,9 @@ export default function App() {
   const [account, setAccount] = useState<string>("");
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+
+  // Synchronized chain metadata based on active MetaMask network
+  const chainInfo = getChainInfo(chainId);
 
   // ── Flow State ───────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<StepPhase>("CONNECT");
@@ -93,6 +97,7 @@ export default function App() {
   const [wrappedDemoAddress, setWrappedDemoAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.wrappedDemo);
 
   // ── Token & Wallet Balances State ─────────────────────────────────────────
+  const [connectedNativeBalance, setConnectedNativeBalance] = useState<string>("0.000");
   const [nativeBalance, setNativeBalance] = useState<string>("0.000");
   const [wDemoTokenBalance, setWDemoTokenBalance] = useState<string>("0.000");
   const [selectedToken, setSelectedToken] = useState<string>("ETH");
@@ -153,6 +158,17 @@ export default function App() {
     setIsRefreshingBalances(true);
 
     try {
+      // 0. Fetch active connected network native balance (real-time from MetaMask)
+      if (window.ethereum) {
+        const browserProvider = new ethers.BrowserProvider(window.ethereum);
+        const bal = await browserProvider.getBalance(targetAddr);
+        setConnectedNativeBalance(parseFloat(ethers.formatEther(bal)).toFixed(4));
+      }
+    } catch (e) {
+      console.warn("Connected network balance fetch:", e);
+    }
+
+    try {
       // 1. Fetch Sepolia Native ETH balance
       const n1 = getN1Provider();
       const n1Bal = await n1.getBalance(targetAddr);
@@ -202,7 +218,10 @@ export default function App() {
   };
 
   const handleMax = () => {
-    if (selectedToken === "ETH") {
+    if (selectedToken === chainInfo.symbol) {
+      const maxVal = Math.max(0, parseFloat(connectedNativeBalance) - 0.002);
+      setAmountEth(maxVal > 0 ? maxVal.toFixed(4) : connectedNativeBalance);
+    } else if (selectedToken === "ETH") {
       const maxVal = Math.max(0, parseFloat(nativeBalance) - 0.002);
       setAmountEth(maxVal > 0 ? maxVal.toFixed(4) : nativeBalance);
     } else {
@@ -619,13 +638,24 @@ export default function App() {
 
           {account ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span className={`badge ${chainId === NETWORKS.amoy.chainIdDec ? "badge-amoy" : "badge-sepolia"}`}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: chainId === NETWORKS.amoy.chainIdDec ? "var(--mauve-400)" : "var(--terracotta-500)" }} />
-                {chainId === NETWORKS.amoy.chainIdDec
-                  ? "Polygon Amoy"
-                  : chainId === NETWORKS.sepolia.chainIdDec
-                  ? "Sepolia"
-                  : `Chain #${chainId}`}
+              <span
+                className={`badge ${chainInfo.isPolygon ? "badge-amoy" : "badge-sepolia"}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderColor: chainInfo.color,
+                  boxShadow: `0 0 12px ${chainInfo.color}33`,
+                  background: chainInfo.isPolygon
+                    ? "rgba(176, 116, 159, 0.25)"
+                    : chainInfo.isEthereum
+                    ? "rgba(216, 97, 60, 0.25)"
+                    : "rgba(255, 255, 255, 0.08)",
+                  fontWeight: "700",
+                }}
+              >
+                <span style={{ fontSize: "13px" }}>{chainInfo.icon}</span>
+                <span>{chainInfo.name}</span>
               </span>
               <div className="badge mono" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-subtle)" }}>
                 {account.slice(0, 6)}...{account.slice(-4)}
@@ -850,12 +880,36 @@ export default function App() {
             </div>
 
             <div className="token-list">
-              <div className="token-chip" onClick={() => setSelectedToken("ETH")} title="Select Sepolia ETH">
-                <span>🔷</span>
-                <span className="token-chip-symbol">Sepolia ETH:</span>
-                <span className="token-chip-balance">{nativeBalance} ETH</span>
+              {/* Connected Active Chain Asset */}
+              <div
+                className={`token-chip ${selectedToken === chainInfo.symbol ? "active" : ""}`}
+                onClick={() => setSelectedToken(chainInfo.symbol)}
+                title={`Active balance on ${chainInfo.name}`}
+              >
+                <span>{chainInfo.icon}</span>
+                <span className="token-chip-symbol">{chainInfo.name}:</span>
+                <span className="token-chip-balance">{connectedNativeBalance} {chainInfo.symbol}</span>
               </div>
-              <div className="token-chip" onClick={() => setSelectedToken("wDEMO")} title="Select Amoy wDEMO">
+
+              {/* Sepolia ETH (if active network is not Sepolia) */}
+              {chainId !== NETWORKS.sepolia.chainIdDec && (
+                <div
+                  className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
+                  onClick={() => setSelectedToken("ETH")}
+                  title="Sepolia ETH"
+                >
+                  <span>🔷</span>
+                  <span className="token-chip-symbol">Sepolia ETH:</span>
+                  <span className="token-chip-balance">{nativeBalance} ETH</span>
+                </div>
+              )}
+
+              {/* Amoy wDEMO */}
+              <div
+                className={`token-chip ${selectedToken === "wDEMO" ? "active" : ""}`}
+                onClick={() => setSelectedToken("wDEMO")}
+                title="Amoy wDEMO"
+              >
                 <span>🟣</span>
                 <span className="token-chip-symbol">Amoy wDEMO:</span>
                 <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
@@ -968,13 +1022,53 @@ export default function App() {
                   Lock native ETH on Sepolia. Your client will construct an inclusion proof off-chain.
                 </p>
               </div>
-              <span className="badge badge-sepolia">Sepolia (N1)</span>
+              <span
+                className={`badge ${chainInfo.isPolygon ? "badge-amoy" : "badge-sepolia"}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderColor: chainInfo.color,
+                  fontWeight: "700",
+                }}
+              >
+                <span>{chainInfo.icon}</span>
+                <span>Active: {chainInfo.name}</span>
+              </span>
             </div>
+
+            {chainInfo.isPolygon && (
+              <div style={{ background: "rgba(176, 116, 159, 0.15)", border: "1px solid var(--mauve-500)", borderRadius: "var(--radius-md)", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                <span style={{ fontSize: "13px", color: "var(--mauve-100)" }}>
+                  🟣 <strong>{chainInfo.name} Active in MetaMask:</strong> You are currently on Polygon ({connectedNativeBalance} {chainInfo.symbol}). When ready to initiate a cross-chain lock on Sepolia, click Switch to Sepolia or use Demo Simulation.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: "4px 10px", fontSize: "11px" }}
+                  onClick={() => switchNetwork("sepolia")}
+                >
+                  Switch to Sepolia ➔
+                </button>
+              </div>
+            )}
 
             {/* Token Selector & Asset Balance Selection */}
             <div style={{ marginBottom: "20px" }}>
               <label className="input-label">Select Asset to Lock & Bridge</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                {/* Active Connected Token Chip */}
+                {chainInfo.symbol !== "ETH" && (
+                  <div
+                    className={`token-chip ${selectedToken === chainInfo.symbol ? "active" : ""}`}
+                    onClick={() => setSelectedToken(chainInfo.symbol)}
+                  >
+                    <span>{chainInfo.icon}</span>
+                    <span className="token-chip-symbol">{chainInfo.symbol} ({chainInfo.name})</span>
+                    <span className="token-chip-balance">{connectedNativeBalance} {chainInfo.symbol}</span>
+                  </div>
+                )}
+
                 <div
                   className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
                   onClick={() => setSelectedToken("ETH")}
