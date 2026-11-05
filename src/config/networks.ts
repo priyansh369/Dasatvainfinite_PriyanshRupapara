@@ -37,8 +37,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     shortName: "Polygon Amoy (N2)",
     symbol: "POL",
     rpcUrls: [
-      "https://rpc-amoy.polygon.technology",
       "https://polygon-amoy-bor-rpc.publicnode.com",
+      "https://rpc-amoy.polygon.technology",
     ],
     blockExplorerUrl: "https://amoy.polygonscan.com",
     color: "#af789b", // Dusty Mauve
@@ -71,12 +71,15 @@ export const NETWORKS: Record<string, NetworkConfig> = {
 /** Default contract addresses */
 export const DEFAULT_CONTRACTS = {
   sepolia: {
-    router: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    router: "0xB59e7218d0FeF27dB36AE54Ef552174958d6355B",
+    realBridge: "0xB59e7218d0FeF27dB36AE54Ef552174958d6355B",
+    headerVerifier: "0x326b8b942234458CeFDb87b3f22E0bC74bD999b3",
   },
   amoy: {
-    verifier: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    verifier: "0x17B6d8FC628BAa2646b10Bce715b3f636374AB51",
     wrappedDemo: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    mockHeaderVerifier: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    mockHeaderVerifier: "0xbE4e93a52C221Af4C9770d81f5a08d224aE872Ad",
+    realBridge: "0x17B6d8FC628BAa2646b10Bce715b3f636374AB51",
   },
 };
 

@@ -9,9 +9,10 @@ import "./interfaces/IHeaderVerifier.sol";
 ///      Production use requires a proper light-client relay or a ZK-proof
 ///      (e.g., Succinct, Axiom, or a custom SP1 circuit) to trustlessly
 ///      verify that a Sepolia block header actually exists on chain.
+///      This is a roadmap item; for the hackathon demo it always returns true.
 contract MockHeaderVerifier is IHeaderVerifier {
     // KNOWN LIMITATION: always returns true — any root is accepted.
-    function verifyHeader(BlockHeader calldata /* header */) external pure override returns (bool) {
+    function verifyHeader(Header calldata /* header */) external pure override returns (bool) {
         return true;
     }
 }

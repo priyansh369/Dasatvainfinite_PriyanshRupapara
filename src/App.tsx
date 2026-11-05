@@ -188,10 +188,27 @@ export default function App() {
     }
   };
 
-  // Custom contract overrides
-  const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.router);
-  const [verifierAddress, setVerifierAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.verifier);
+  // Live RealCrossChainBridge contract addresses
+  const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.realBridge);
+  const [verifierAddress, setVerifierAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.realBridge);
   const [wrappedDemoAddress, setWrappedDemoAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.wrappedDemo);
+
+  // ── Dynamic Cross-Chain Route (ETH <-> POL Bidirectional) ────────────────
+  const isAmoyToSepolia = sendCurrency === "POL" || (receiveCurrency === "ETH" && sendCurrency !== "ETH") || (chainId === 80002 && sendCurrency !== "ETH");
+
+  const sourceNetworkKey: "sepolia" | "amoy" = isAmoyToSepolia ? "amoy" : "sepolia";
+  const destNetworkKey: "sepolia" | "amoy"   = isAmoyToSepolia ? "sepolia" : "amoy";
+
+  const sourceNetwork = NETWORKS[sourceNetworkKey];
+  const destNetwork   = NETWORKS[destNetworkKey];
+
+  const currentSourceBridgeAddress = isAmoyToSepolia
+    ? (DEFAULT_CONTRACTS.amoy.realBridge || routerAddress)
+    : (DEFAULT_CONTRACTS.sepolia.realBridge || routerAddress);
+
+  const currentDestBridgeAddress = isAmoyToSepolia
+    ? (DEFAULT_CONTRACTS.sepolia.realBridge || verifierAddress)
+    : (DEFAULT_CONTRACTS.amoy.realBridge || verifierAddress);
 
   // ── Token & Wallet Balances State ─────────────────────────────────────────
   const [connectedNativeBalance, setConnectedNativeBalance] = useState<string>("0.000");
@@ -462,16 +479,20 @@ export default function App() {
     setIsBusy(true);
     setErrorMessage("");
 
-    // Calculate effective ETH deposit for smart contract
-    const effectiveEth = sendCurrency === "ETH"
-      ? exchangeAmount
-      : (Math.max(0.0001, parseFloat(exchangeAmount) / 2650)).toFixed(6);
+    // Calculate effective native deposit for smart contract
+    let effectiveAmount = exchangeAmount;
+    if (sendCurrency === "ETH" || sendCurrency === "POL") {
+      effectiveAmount = exchangeAmount;
+    } else {
+      const rate = isAmoyToSepolia ? 0.36 : 2650;
+      effectiveAmount = (Math.max(0.0001, parseFloat(exchangeAmount) / rate)).toFixed(6);
+    }
 
     // 🎮 Demo Simulation Mode (Zero gas & instant execution)
     if (isDemoMode) {
       startStopwatch();
       try {
-        const demo = buildDemoProof(account, recipient || account, effectiveEth);
+        const demo = buildDemoProof(account, recipient || account, effectiveAmount);
         const txId = `demo-${Date.now()}`;
         setActiveTxId(txId);
         setSubmitResult(demo.submitResult);
@@ -492,16 +513,16 @@ export default function App() {
           recipient: recipient || account,
           sender: account,
           sourceChain: {
-            id: chainId || 11155111,
-            name: chainInfo.name,
-            symbol: chainInfo.symbol,
-            icon: chainInfo.icon,
+            id: sourceNetwork.chainIdDec,
+            name: sourceNetwork.name,
+            symbol: sourceNetwork.symbol,
+            icon: sourceNetwork.icon,
           },
           destChain: {
-            id: 80002,
-            name: "Polygon Amoy",
-            symbol: "POL",
-            icon: "🟣",
+            id: destNetwork.chainIdDec,
+            name: destNetwork.name,
+            symbol: destNetwork.symbol,
+            icon: destNetwork.icon,
           },
           sourceTxHash: demo.submitResult.txHash,
           proofData: {
@@ -532,10 +553,12 @@ export default function App() {
 
     // 🌐 Live Network Flow
     try {
-      // Ensure on Sepolia or Localhost N1
-      const targetChainId = networkMode === "testnet" ? NETWORKS.sepolia.chainIdDec : 31337;
+      // Ensure connected on source network
+      const targetChainId = networkMode === "testnet" ? sourceNetwork.chainIdDec : 31337;
       if (chainId !== targetChainId) {
-        await switchNetwork("sepolia");
+        await switchNetwork(sourceNetworkKey);
+        setIsBusy(false);
+        return;
       }
 
       startStopwatch();
@@ -543,28 +566,26 @@ export default function App() {
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
 
       // Pre-flight validation: check if contract is actually deployed
-      const code = await browserProvider.getCode(routerAddress);
+      const code = await browserProvider.getCode(currentSourceBridgeAddress);
       if (!code || code === "0x" || code === "0x0") {
         throw new Error(
-          `No Router smart contract is deployed at ${routerAddress} on ${
-            networkMode === "testnet" ? "Ethereum Sepolia" : "Chain #" + chainId
-          }. Please toggle to "Demo Simulation Mode" above to test with zero gas, or deploy Router.sol and configure its address in Settings (⚙️).`
+          `No Bridge smart contract is deployed at ${currentSourceBridgeAddress} on ${sourceNetwork.name}.`
         );
       }
 
-      const n2Provider = getN2Provider();
+      const destProvider = isAmoyToSepolia ? getN1Provider() : getN2Provider();
 
       const config: CrossChainConfig = {
-        routerAddress,
+        routerAddress: currentSourceBridgeAddress,
         n1Provider: browserProvider,
         n1Signer: signer,
-        verifierAddress,
-        n2Provider,
-        n2Signer: signer, // will be replaced in Phase 2 with Amoy signer
+        verifierAddress: currentDestBridgeAddress,
+        n2Provider: destProvider,
+        n2Signer: signer,
       };
 
       // 1. Submit Request
-      const sub = await submitRequest(config, recipient, effectiveEth);
+      const sub = await submitRequest(config, recipient || account, effectiveAmount);
       setSubmitResult(sub);
       setCurrentConfirmations(1);
 
@@ -586,19 +607,19 @@ export default function App() {
         receiveAmount: receiveAmount,
         receiveToken: receiveCurrency,
         exchangeRate: exchangeRateString,
-        recipient,
+        recipient: recipient || account,
         sender: account,
         sourceChain: {
-          id: chainId || 11155111,
-          name: chainInfo.name,
-          symbol: chainInfo.symbol,
-          icon: chainInfo.icon,
+          id: sourceNetwork.chainIdDec,
+          name: sourceNetwork.name,
+          symbol: sourceNetwork.symbol,
+          icon: sourceNetwork.icon,
         },
         destChain: {
-          id: 80002,
-          name: "Polygon Amoy",
-          symbol: "POL",
-          icon: "🟣",
+          id: destNetwork.chainIdDec,
+          name: destNetwork.name,
+          symbol: destNetwork.symbol,
+          icon: destNetwork.icon,
         },
         sourceTxHash: sub.txHash,
         proofData: {
@@ -683,29 +704,31 @@ export default function App() {
 
     // 🌐 Live Network Flow
     try {
-      // Ensure on Polygon Amoy or Localhost N2
-      const targetChainId = networkMode === "testnet" ? NETWORKS.amoy.chainIdDec : 31337;
+      // Ensure on destination network
+      const targetChainId = networkMode === "testnet" ? destNetwork.chainIdDec : 31337;
       if (chainId !== targetChainId) {
-        await switchNetwork("amoy");
+        await switchNetwork(destNetworkKey);
+        setIsBusy(false);
+        return;
       }
 
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
 
-      // Pre-flight check: ensure Verifier contract is deployed
-      const verifierCode = await browserProvider.getCode(verifierAddress);
+      // Pre-flight check: ensure destination Bridge contract is deployed
+      const verifierCode = await browserProvider.getCode(currentDestBridgeAddress);
       if (!verifierCode || verifierCode === "0x" || verifierCode === "0x0") {
         throw new Error(
-          `No Verifier contract found at ${verifierAddress} on Polygon Amoy. Please enable "Demo Simulation Mode" or configure the address in Settings.`
+          `No Bridge contract found at ${currentDestBridgeAddress} on ${destNetwork.name}. Please ensure your wallet is connected to ${destNetwork.name}.`
         );
       }
 
-      const n1Provider = getN1Provider();
+      const sourceProvider = isAmoyToSepolia ? getN2Provider() : getN1Provider();
 
       const config: CrossChainConfig = {
-        routerAddress,
-        n1Provider,
+        routerAddress: currentSourceBridgeAddress,
+        n1Provider: sourceProvider,
         n1Signer: signer,
-        verifierAddress,
+        verifierAddress: currentDestBridgeAddress,
         n2Provider: browserProvider,
         n2Signer: signer,
       };
@@ -735,12 +758,11 @@ export default function App() {
         setTransactions(updated);
       }
 
-      // Read updated wDEMO balance
+      // Read updated real native balance on destination chain
       try {
-        const wDemo = new ethers.Contract(wrappedDemoAddress, WRAPPED_DEMO_ABI, browserProvider);
-        const bal: bigint = await wDemo.balanceOf(recipient);
-        const dec: bigint = await wDemo.decimals();
-        setWDemoBalance(`${ethers.formatUnits(bal, dec)} ${receiveCurrency}`);
+        const bal = await browserProvider.getBalance(recipient || account);
+        const payoutSymbol = isAmoyToSepolia ? "ETH" : "POL";
+        setWDemoBalance(`${ethers.formatEther(bal).slice(0, 7)} ${payoutSymbol}`);
       } catch {
         setWDemoBalance(`${receiveAmount} ${receiveCurrency}`);
       }
@@ -1694,17 +1716,38 @@ export default function App() {
                   </div>
                   <div>
                     <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)" }}>
-                      Sepolia Block #{submitResult.blockNumber} Finality
+                      {sourceNetwork.name} Block #{submitResult.blockNumber} Finality
                     </div>
-                    <div className="mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                      Tx:{" "}
+                    <div className="mono" style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "3px" }}>
+                      <span>Tx:</span>
                       <a
-                        href={`${NETWORKS.sepolia.blockExplorerUrl}/tx/${submitResult.txHash}`}
+                        href={`${sourceNetwork.blockExplorerUrl}/tx/${submitResult.txHash}`}
                         target="_blank"
                         rel="noreferrer"
                         className="explorer-link"
                       >
-                        {submitResult.txHash.slice(0, 14)}...{submitResult.txHash.slice(-8)}
+                        {submitResult.txHash.slice(0, 10)}...{submitResult.txHash.slice(-6)}
+                        <ExternalLink size={10} />
+                      </a>
+                      <a
+                        href={`${sourceNetwork.blockExplorerUrl}/tx/${submitResult.txHash}#eventlog`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: "rgba(216, 97, 60, 0.1)",
+                          color: "var(--terracotta-700)",
+                          border: "1px solid rgba(216, 97, 60, 0.25)",
+                          borderRadius: "4px",
+                          padding: "1px 6px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          textDecoration: "none",
+                        }}
+                      >
+                        📜 View Event Logs on {sourceNetwork.name.includes("Polygon") ? "Polygonscan" : "Etherscan"}
                         <ExternalLink size={10} />
                       </a>
                     </div>
@@ -1739,23 +1782,23 @@ export default function App() {
               />
             </div>
 
-            {/* Action Bar: Network Switch / Submit to Polygon Amoy */}
+            {/* Action Bar: Network Switch / Submit to Destination Network */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
               <div>
-                {chainId !== NETWORKS.amoy.chainIdDec && (
+                {chainId !== destNetwork.chainIdDec && (
                   <span style={{ fontSize: "13px", color: "var(--terracotta-400)" }}>
-                    ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to Polygon Amoy.
+                    ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to {destNetwork.name}.
                   </span>
                 )}
               </div>
 
               <div style={{ display: "flex", gap: "12px" }}>
-                {chainId !== NETWORKS.amoy.chainIdDec ? (
+                {chainId !== destNetwork.chainIdDec ? (
                   <button
                     className="btn btn-polygon"
-                    onClick={() => switchNetwork("amoy")}
+                    onClick={() => switchNetwork(destNetworkKey)}
                   >
-                    Switch to Polygon Amoy (N2)
+                    Switch to {destNetwork.name} ({destNetworkKey === "sepolia" ? "N1" : "N2"})
                     <ArrowRight size={16} />
                   </button>
                 ) : (
@@ -1765,7 +1808,7 @@ export default function App() {
                     disabled={isBusy}
                   >
                     <Coins size={16} />
-                    {isBusy ? "Submitting Proof..." : "Submit Proof & Mint wDEMO"}
+                    {isBusy ? "Submitting Proof..." : `Submit Proof & Claim ${receiveCurrency || destNetwork.symbol}`}
                   </button>
                 )}
               </div>
@@ -1773,17 +1816,17 @@ export default function App() {
           </div>
         )}
 
-        {/* State 4: Verifying on Amoy */}
+        {/* State 4: Verifying on Destination Network */}
         {phase === "PHASE2_VERIFYING" && (
           <div style={{ textAlign: "center", padding: "40px 20px" }}>
             <div className="brand-icon animate-spin" style={{ width: "56px", height: "56px", margin: "0 auto 20px auto" }}>
               <Cpu size={28} />
             </div>
             <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "8px" }}>
-              Verifying Proof on Polygon Amoy
+              Verifying Proof on {destNetwork.name}
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: "14px", maxWidth: "480px", margin: "0 auto" }}>
-              Calling <code>Verifier.verifyAndExecute()</code>. Contract will verify Merkle inclusion against the header root and mint wDEMO to {recipient.slice(0, 6)}...{recipient.slice(-4)}.
+              Calling <code>RealCrossChainBridge.executeTransaction()</code>. Contract will verify Merkle inclusion against the verified block header root and release {receiveAmount} {receiveCurrency} to {recipient.slice(0, 6)}...{recipient.slice(-4)}.
             </p>
           </div>
         )}
@@ -1798,7 +1841,7 @@ export default function App() {
               Cross-Chain Verification Succeeded!
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "15px", marginBottom: "24px" }}>
-              wDEMO tokens have been minted on Polygon Amoy directly via user-mediated Merkle proof.
+              {receiveAmount} {receiveCurrency} settled on {destNetwork.name} directly via user-mediated Merkle proof.
             </p>
 
             <div className="proof-box" style={{ maxWidth: "640px", margin: "0 auto 28px auto", textAlign: "left" }}>
@@ -1825,30 +1868,76 @@ export default function App() {
                 </span>
               </div>
               {verifyTxHash && (
-                <div className="proof-item">
-                  <span className="proof-label">Amoy Tx Hash:</span>
+                <div className="proof-item" style={{ alignItems: "center" }}>
+                  <span className="proof-label">{destNetwork.shortName} Settlement Tx:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <a
+                      href={`${destNetwork.blockExplorerUrl}/tx/${verifyTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="explorer-link"
+                    >
+                      {verifyTxHash.slice(0, 12)}...{verifyTxHash.slice(-8)}
+                      <ExternalLink size={12} />
+                    </a>
+                    <a
+                      href={`${destNetwork.blockExplorerUrl}/tx/${verifyTxHash}#eventlog`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        background: "rgba(5, 150, 105, 0.1)",
+                        color: "#059669",
+                        border: "1px solid rgba(5, 150, 105, 0.3)",
+                        borderRadius: "5px",
+                        padding: "2px 8px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        textDecoration: "none",
+                      }}
+                    >
+                      📜 View Event Logs on {destNetwork.name.includes("Polygon") ? "Polygonscan" : "Etherscan"}
+                      <ExternalLink size={10} />
+                    </a>
+                  </div>
+                </div>
+              )}
+              <div className="proof-item" style={{ alignItems: "center" }}>
+                <span className="proof-label">{sourceNetwork.shortName} Lock Tx:</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <a
-                    href={`${NETWORKS.amoy.blockExplorerUrl}/tx/${verifyTxHash}`}
+                    href={`${sourceNetwork.blockExplorerUrl}/tx/${submitResult.txHash}`}
                     target="_blank"
                     rel="noreferrer"
                     className="explorer-link"
                   >
-                    {verifyTxHash.slice(0, 16)}...{verifyTxHash.slice(-10)}
+                    {submitResult.txHash.slice(0, 12)}...{submitResult.txHash.slice(-8)}
                     <ExternalLink size={12} />
                   </a>
+                  <a
+                    href={`${sourceNetwork.blockExplorerUrl}/tx/${submitResult.txHash}#eventlog`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      background: "rgba(216, 97, 60, 0.1)",
+                      color: "var(--terracotta-700)",
+                      border: "1px solid rgba(216, 97, 60, 0.25)",
+                      borderRadius: "5px",
+                      padding: "2px 8px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      textDecoration: "none",
+                    }}
+                  >
+                    📜 View Event Logs on {sourceNetwork.name.includes("Polygon") ? "Polygonscan" : "Etherscan"}
+                    <ExternalLink size={10} />
+                  </a>
                 </div>
-              )}
-              <div className="proof-item">
-                <span className="proof-label">Sepolia Tx Hash:</span>
-                <a
-                  href={`${NETWORKS.sepolia.blockExplorerUrl}/tx/${submitResult.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="explorer-link"
-                >
-                  {submitResult.txHash.slice(0, 16)}...{submitResult.txHash.slice(-10)}
-                  <ExternalLink size={12} />
-                </a>
               </div>
               <div className="proof-item">
                 <span className="proof-label">Total End-to-End Time:</span>

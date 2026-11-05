@@ -114,6 +114,13 @@ export default function TransactionHistoryModal({
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
+  const getExplorerBase = (chainId?: number, chainName?: string) => {
+    if (chainId === 80002 || (chainName && chainName.toLowerCase().includes("polygon"))) {
+      return "https://amoy.polygonscan.com";
+    }
+    return "https://sepolia.etherscan.io";
+  };
+
   const handleExportAll = () => {
     if (!transactions || transactions.length === 0) return;
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
@@ -716,7 +723,7 @@ export default function TransactionHistoryModal({
 
                     <div>
                       <span style={{ color: "var(--text-muted)", display: "block", marginBottom: "2px" }}>
-                        Source Tx (Sepolia):
+                        Source Tx ({tx.sourceChain?.name || "Source"}):
                       </span>
                       {tx.sourceTxHash ? (
                         tx.isDemo ? (
@@ -724,23 +731,46 @@ export default function TransactionHistoryModal({
                             {truncateAddress(tx.sourceTxHash)} (Simulated)
                           </span>
                         ) : (
-                          <a
-                            href={`https://sepolia.etherscan.io/tx/${tx.sourceTxHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              color: "var(--terracotta-600)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              textDecoration: "none",
-                              fontFamily: "var(--font-mono)",
-                              fontWeight: "600",
-                            }}
-                          >
-                            {truncateAddress(tx.sourceTxHash)}
-                            <ExternalLink size={11} />
-                          </a>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                            <a
+                              href={`${getExplorerBase(tx.sourceChain?.id, tx.sourceChain?.name)}/tx/${tx.sourceTxHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                color: "var(--terracotta-600)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                textDecoration: "none",
+                                fontFamily: "var(--font-mono)",
+                                fontWeight: "600",
+                              }}
+                            >
+                              {truncateAddress(tx.sourceTxHash)}
+                              <ExternalLink size={11} />
+                            </a>
+                            <a
+                              href={`${getExplorerBase(tx.sourceChain?.id, tx.sourceChain?.name)}/tx/${tx.sourceTxHash}#eventlog`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Directly view contract event logs on block explorer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                background: "rgba(216, 97, 60, 0.1)",
+                                color: "var(--terracotta-700)",
+                                border: "1px solid rgba(216, 97, 60, 0.25)",
+                                borderRadius: "4px",
+                                padding: "1px 5px",
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                textDecoration: "none",
+                              }}
+                            >
+                              📜 Logs
+                            </a>
+                          </div>
                         )
                       ) : (
                         <span style={{ color: "var(--text-muted)" }}>Pending</span>
@@ -749,7 +779,7 @@ export default function TransactionHistoryModal({
 
                     <div>
                       <span style={{ color: "var(--text-muted)", display: "block", marginBottom: "2px" }}>
-                        Destination Tx (Amoy):
+                        Destination Tx ({tx.destChain?.name || "Destination"}):
                       </span>
                       {tx.destTxHash ? (
                         tx.isDemo ? (
@@ -757,23 +787,46 @@ export default function TransactionHistoryModal({
                             {truncateAddress(tx.destTxHash)} (Simulated)
                           </span>
                         ) : (
-                          <a
-                            href={`https://amoy.polygonscan.com/tx/${tx.destTxHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              color: "var(--plum-700)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              textDecoration: "none",
-                              fontFamily: "var(--font-mono)",
-                              fontWeight: "600",
-                            }}
-                          >
-                            {truncateAddress(tx.destTxHash)}
-                            <ExternalLink size={11} />
-                          </a>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                            <a
+                              href={`${getExplorerBase(tx.destChain?.id, tx.destChain?.name)}/tx/${tx.destTxHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                color: "var(--plum-700)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                textDecoration: "none",
+                                fontFamily: "var(--font-mono)",
+                                fontWeight: "600",
+                              }}
+                            >
+                              {truncateAddress(tx.destTxHash)}
+                              <ExternalLink size={11} />
+                            </a>
+                            <a
+                              href={`${getExplorerBase(tx.destChain?.id, tx.destChain?.name)}/tx/${tx.destTxHash}#eventlog`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Directly view contract event logs on block explorer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                background: "rgba(5, 150, 105, 0.1)",
+                                color: "#059669",
+                                border: "1px solid rgba(5, 150, 105, 0.25)",
+                                borderRadius: "4px",
+                                padding: "1px 5px",
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                textDecoration: "none",
+                              }}
+                            >
+                              📜 Logs
+                            </a>
+                          </div>
                         )
                       ) : (
                         <span style={{ color: "var(--text-muted)" }}>Pending verification</span>

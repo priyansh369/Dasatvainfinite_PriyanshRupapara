@@ -29,6 +29,9 @@ CryptoXchange demonstrates a decentralized, client-mediated cross-chain bridge b
 ```text
 CryptoXchange/
 ├── contracts/
+│   ├── RealCrossChainBridge.sol  # Production bidirectional real bridge & smart contract executor
+│   ├── MockERC20.sol             # ERC-20 token for cross-chain transfer testing
+│   ├── SampleTargetReceiver.sol  # Destination contract for arbitrary cross-chain calls
 │   ├── Router.sol                # Locks ETH on N1 (Sepolia), pushes to incremental Merkle tree
 │   ├── Verifier.sol              # Verifies Merkle proof on N2 (Amoy), mints wDEMO
 │   ├── WrappedDemo.sol           # ERC20 token minted to recipient upon verification
@@ -41,15 +44,17 @@ CryptoXchange/
 │   ├── config/
 │   │   └── networks.ts           # Sepolia, Polygon Amoy, and Local RPC/Chain definitions
 │   └── lib/
-│       └── crossChain.ts         # Ethers v6 SDK: submitRequest, waitForConfirmations, rebuildTree, buildProof, submitToVerifier, reclaimRequest
+│       └── crossChain.ts         # Ethers v6 SDK: submitRequest, rebuildTree, buildProof, submitRealBridgeRequest, executeRealBridgeTransaction
 ├── scripts/
+│   ├── deploy-real-bridge.ts     # Deploy RealCrossChainBridge to Sepolia / Amoy / Localhost
 │   ├── deploy-n1.ts              # Deploy Router to Sepolia / Localhost
 │   ├── deploy-n2.ts              # Deploy HeaderVerifier + WrappedDemo + Verifier to Amoy / Localhost
 │   └── test-flow.ts              # Full 7-phase integration test (spawns 2 nodes or runs live)
 ├── test/
+│   ├── RealCrossChainBridge.test.ts # Comprehensive tests for real payouts, ERC20, contract calls, & edge cases
 │   ├── Router.test.ts            # Unit tests for Router (locking, id increments, reclaim logic)
 │   └── Verifier.test.ts          # Unit tests for Verifier (valid proofs, tampering, wrong root, replays, deadlines)
-├── hardhat.config.ts             # Hardhat config with Cancun EVM support (mcopy opcode)
+├── hardhat.config.ts             # Hardhat config with Cancun EVM & viaIR support
 └── vite.config.ts                # Vite bundler config with React plugin
 ```
 
@@ -65,7 +70,16 @@ npm install
 ### 2. Run Smart Contract Unit Tests
 ```bash
 npx hardhat test
-# All 16 tests passing (Router + Verifier)
+# All 33 tests passing (RealCrossChainBridge + Router + Verifier)
+```
+
+### 3. Deploy Real Cross-Chain Bridge
+```bash
+# Deploy to Sepolia (N1)
+npm run deploy:real:n1
+
+# Deploy to Polygon Amoy (N2)
+npm run deploy:real:n2
 ```
 
 ### 3. Run End-to-End Integration Flow (Dual Local Nodes)

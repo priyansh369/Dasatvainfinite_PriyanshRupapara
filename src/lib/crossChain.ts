@@ -203,36 +203,73 @@ export async function submitRequest(
   recipient: string,
   valueEth: string,
 ): Promise<SubmitResult> {
-  const router = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Signer);
-  const value  = ethers.parseEther(valueEth);
+  const value = ethers.parseEther(valueEth);
+  const routerIface = new ethers.Interface(ROUTER_ABI);
+  const realIface = new ethers.Interface(REAL_BRIDGE_ABI);
 
-  const tx      = await router.initiateRequest(recipient, { value });
+  let tx: ethers.ContractTransactionResponse;
+
+  // 1. Try calling RealCrossChainBridge.initiate first
+  try {
+    const realBridge = new ethers.Contract(config.routerAddress, REAL_BRIDGE_ABI, config.n1Signer);
+    const net = await config.n1Provider.getNetwork();
+    const destChainId = net.chainId === 11155111n ? 80002n : net.chainId === 80002n ? 11155111n : 31337n;
+
+    tx = await realBridge.initiate(
+      destChainId,
+      recipient,
+      ethers.ZeroAddress,
+      value,
+      ethers.ZeroAddress,
+      "0x",
+      { value }
+    );
+  } catch (bridgeErr: any) {
+    // Fallback to legacy Router.initiateRequest
+    try {
+      const router = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Signer);
+      tx = await router.initiateRequest(recipient, { value });
+    } catch {
+      throw bridgeErr;
+    }
+  }
+
   const receipt = await tx.wait(1);
   if (!receipt) throw new Error("submitRequest: no receipt returned");
   if (receipt.status === 0) {
     throw new Error("Transaction reverted on-chain. Please verify contract conditions and parameters.");
   }
 
-  const iface = new ethers.Interface(ROUTER_ABI);
   let id = 0n, leaf = "", deadline = 0n;
   let found = false;
 
   for (const log of receipt.logs) {
     try {
-      const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
-      if (parsed?.name === "RequestCreated") {
-        id       = parsed.args.id       as bigint;
-        leaf     = parsed.args.leaf     as string;
+      const parsed = realIface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (parsed?.name === "TransactionInitiated") {
+        id = parsed.args.id as bigint;
+        leaf = parsed.args.leaf as string;
         deadline = parsed.args.deadline as bigint;
-        found    = true;
+        found = true;
         break;
       }
-    } catch { /* skip unrelated logs */ }
+    } catch { /* skip */ }
+
+    try {
+      const parsed = routerIface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (parsed?.name === "RequestCreated") {
+        id = parsed.args.id as bigint;
+        leaf = parsed.args.leaf as string;
+        deadline = parsed.args.deadline as bigint;
+        found = true;
+        break;
+      }
+    } catch { /* skip */ }
   }
 
   if (!found) {
     throw new Error(
-      `No RequestCreated event emitted at ${config.routerAddress}. Make sure the Router smart contract is actually deployed at this address on this network.`
+      `No TransactionInitiated or RequestCreated event emitted at ${config.routerAddress}. Make sure the contract is deployed on this network.`
     );
   }
 
@@ -295,45 +332,46 @@ export async function rebuildTree(
   config: CrossChainConfig,
   fromBlock?: number,
 ): Promise<TreeState> {
-  const router     = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
-  const iface      = new ethers.Interface(ROUTER_ABI);
-  const eventTopic = iface.getEvent("RequestCreated")!.topicHash;
+  const routerIface = new ethers.Interface(ROUTER_ABI);
+  const realIface   = new ethers.Interface(REAL_BRIDGE_ABI);
+
+  const topicRequestCreated = routerIface.getEvent("RequestCreated")!.topicHash;
+  const topicTxInitiated    = realIface.getEvent("TransactionInitiated")!.topicHash;
 
   let totalRequests = 0;
   try {
-    const nextIdBn: bigint = await router.nextId();
+    const routerContract = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
+    const nextIdBn: bigint = await routerContract.nextId();
     totalRequests = Number(nextIdBn);
   } catch (err) {
-    console.warn("Could not read router.nextId():", err);
+    console.warn("Could not read contract.nextId():", err);
   }
 
   let startBlock = fromBlock;
   if (startBlock === undefined) {
     try {
       const curBlock = await config.n1Provider.getBlockNumber();
-      // On live testnets, query recent blocks to respect public RPC range caps
       startBlock = Math.max(0, curBlock - 30_000);
     } catch {
       startBlock = 0;
     }
   }
 
-  // ── Fetch RequestCreated logs with range fallback ────────────────────────
+  // ── Fetch logs with range fallback ───────────────────────────────────────
   let rawLogs: ethers.Log[] = [];
   try {
     rawLogs = await config.n1Provider.getLogs({
       address:   config.routerAddress,
-      topics:    [eventTopic],
+      topics:    [[topicRequestCreated, topicTxInitiated]],
       fromBlock: startBlock,
       toBlock:   "latest",
     });
   } catch {
-    // If range was too wide for public RPC, fallback to narrower window
     try {
       const curBlock = await config.n1Provider.getBlockNumber();
       rawLogs = await config.n1Provider.getLogs({
         address:   config.routerAddress,
-        topics:    [eventTopic],
+        topics:    [[topicRequestCreated, topicTxInitiated]],
         fromBlock: Math.max(0, curBlock - 3_000),
         toBlock:   "latest",
       });
@@ -346,26 +384,45 @@ export async function rebuildTree(
   const entries: Array<{ id: bigint; leaf: string; request: RequestData }> = [];
 
   for (const log of rawLogs) {
-    const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
-    if (!parsed) continue;
-    const id        = parsed.args.id        as bigint;
-    const leaf      = parsed.args.leaf      as string;
-    const sender    = parsed.args.sender    as string;
-    const recipient = parsed.args.recipient as string;
-    const value     = parsed.args.value     as bigint;
-    const deadline  = parsed.args.deadline  as bigint;
-    entries.push({ id, leaf, request: { id, sender, recipient, value, deadline } });
+    let parsed = null;
+    try {
+      parsed = realIface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (parsed && parsed.name === "TransactionInitiated") {
+        const id = parsed.args.id as bigint;
+        const leaf = parsed.args.leaf as string;
+        const sender = parsed.args.sender as string;
+        const recipient = parsed.args.recipient as string;
+        const value = parsed.args.amount as bigint;
+        const deadline = parsed.args.deadline as bigint;
+        entries.push({ id, leaf, request: { id, sender, recipient, value, deadline } });
+        continue;
+      }
+    } catch { /* try legacy */ }
+
+    try {
+      parsed = routerIface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (parsed && parsed.name === "RequestCreated") {
+        const id = parsed.args.id as bigint;
+        const leaf = parsed.args.leaf as string;
+        const sender = parsed.args.sender as string;
+        const recipient = parsed.args.recipient as string;
+        const value = (parsed.args.value ?? parsed.args.amount) as bigint;
+        const deadline = parsed.args.deadline as bigint;
+        entries.push({ id, leaf, request: { id, sender, recipient, value, deadline } });
+      }
+    } catch { /* skip */ }
   }
 
   // Fallback: If logs missed any requests due to RPC indexing, query directly
   if (totalRequests > entries.length) {
     try {
+      const routerContract = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
       const existingIds = new Set(entries.map((e) => e.id.toString()));
       for (let i = 0; i < totalRequests; i++) {
         if (!existingIds.has(i.toString())) {
           const [leaf, req] = await Promise.all([
-            router.leaves(i),
-            router.requests(i),
+            routerContract.leaves(i),
+            routerContract.requests(i),
           ]);
           entries.push({
             id: BigInt(i),
@@ -381,7 +438,7 @@ export async function rebuildTree(
         }
       }
     } catch (e) {
-      console.warn("Direct leaf fetch error:", e);
+      console.warn("Direct contract leaf fallback failed:", e);
     }
   }
 
@@ -394,7 +451,8 @@ export async function rebuildTree(
 
   // ── Assert root matches on-chain value ───────────────────────────────────
   try {
-    const onChainRoot = (await router.root()) as string;
+    const routerContract = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
+    const onChainRoot = (await routerContract.root()) as string;
     if (computedRoot.toLowerCase() !== onChainRoot.toLowerCase()) {
       throw new Error(
         `rebuildTree: root mismatch!\n` +
@@ -527,11 +585,40 @@ export async function submitToVerifier(
   proof: string[],
   request: RequestData,
 ): Promise<ethers.TransactionReceipt> {
-  const verifier = new ethers.Contract(config.verifierAddress, VERIFIER_ABI, config.n2Signer);
-  const tx       = await verifier.verifyAndExecute(header, proof, request);
-  const receipt  = await tx.wait(1);
-  if (!receipt) throw new Error("submitToVerifier: no receipt for verifyAndExecute");
-  return receipt;
+  // 1. Try RealCrossChainBridge.executeTransaction
+  try {
+    const realBridge = new ethers.Contract(config.verifierAddress, REAL_BRIDGE_ABI, config.n2Signer);
+    const net = await config.n2Provider.getNetwork();
+    const sourceChainId = net.chainId === 80002n ? 11155111n : net.chainId === 11155111n ? 80002n : 31337n;
+
+    const req = {
+      id: request.id,
+      sender: request.sender,
+      recipient: request.recipient,
+      token: ethers.ZeroAddress,
+      amount: request.value,
+      targetCall: ethers.ZeroAddress,
+      callDataHash: ethers.keccak256("0x"),
+      deadline: request.deadline,
+      destChainId: net.chainId,
+    };
+
+    const tx = await realBridge.executeTransaction(sourceChainId, header, proof, req, "0x");
+    const receipt = await tx.wait(1);
+    if (!receipt) throw new Error("submitToVerifier: no receipt returned");
+    return receipt;
+  } catch (bridgeErr: any) {
+    // 2. Fallback to legacy Verifier.verifyAndExecute
+    try {
+      const verifier = new ethers.Contract(config.verifierAddress, VERIFIER_ABI, config.n2Signer);
+      const tx       = await verifier.verifyAndExecute(header, proof, request);
+      const receipt  = await tx.wait(1);
+      if (!receipt) throw new Error("submitToVerifier: no receipt for verifyAndExecute");
+      return receipt;
+    } catch {
+      throw bridgeErr;
+    }
+  }
 }
 
 /**
@@ -548,4 +635,120 @@ export async function reclaimRequest(
   if (!receipt) throw new Error("reclaimRequest: no receipt for reclaim");
   return receipt;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Real Cross-Chain Bridge & Smart Contract Transaction Executor ABI & Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const REAL_BRIDGE_ABI = [
+  "function initiate(uint256 destChainId, address recipient, address token, uint256 amount, address targetCall, bytes callData) payable returns (uint256)",
+  "function executeTransaction(uint256 sourceChainId, tuple(uint256 sourceBlock, bytes32 root) header, bytes32[] proof, tuple(uint256 id, address sender, address recipient, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, uint256 destChainId) req, bytes callData)",
+  "function root() view returns (bytes32)",
+  "function nextId() view returns (uint256)",
+  "function processed(uint256 sourceChainId, uint256 id) view returns (bool)",
+  "function getLiquidity(address token) view returns (uint256)",
+  "function depositLiquidity(address token, uint256 amount) payable",
+  "function reclaim(uint256 id)",
+  "event TransactionInitiated(uint256 indexed id, address indexed sender, address indexed recipient, uint256 destChainId, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, bytes32 leaf, bytes32 newRoot)",
+  "event TransactionExecuted(uint256 indexed id, uint256 indexed sourceChainId, address indexed recipient, address token, uint256 amount, address targetCall)",
+  "event TargetCallExecuted(uint256 indexed id, address indexed targetCall, bool success, bytes returnData)",
+  "event Reclaimed(uint256 indexed id, address indexed sender, address token, uint256 amount)",
+  "event LiquidityAdded(address indexed provider, address indexed token, uint256 amount)",
+  "event LiquidityWithdrawn(address indexed to, address indexed token, uint256 amount)"
+] as const;
+
+export interface RealCrossChainRequest {
+  id: bigint;
+  sender: string;
+  recipient: string;
+  token: string;
+  amount: bigint;
+  targetCall: string;
+  callDataHash: string;
+  deadline: bigint;
+  destChainId: bigint;
+}
+
+export interface RealSubmitResult {
+  txHash: string;
+  blockNumber: number;
+  id: bigint;
+  leaf: string;
+  deadline: bigint;
+  callDataHash: string;
+}
+
+/**
+ * Initiate real transaction on RealCrossChainBridge (supports native ETH/POL, ERC-20, and arbitrary contract calls).
+ */
+export async function submitRealBridgeRequest(
+  bridgeAddress: string,
+  signer: ethers.Signer,
+  destChainId: bigint,
+  recipient: string,
+  token: string,
+  amountWei: bigint,
+  targetCall: string = ethers.ZeroAddress,
+  callData: string = "0x"
+): Promise<RealSubmitResult> {
+  const bridge = new ethers.Contract(bridgeAddress, REAL_BRIDGE_ABI, signer);
+  const isNative = token === ethers.ZeroAddress;
+
+  const tx = await bridge.initiate(
+    destChainId,
+    recipient,
+    token,
+    amountWei,
+    targetCall,
+    callData,
+    isNative ? { value: amountWei } : {}
+  );
+
+  const receipt = await tx.wait(1);
+  if (!receipt) throw new Error("submitRealBridgeRequest: no receipt returned");
+
+  const iface = new ethers.Interface(REAL_BRIDGE_ABI);
+  let id = 0n, leaf = "", deadline = 0n, callDataHash = "";
+  let found = false;
+
+  for (const log of receipt.logs) {
+    try {
+      const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (parsed?.name === "TransactionInitiated") {
+        id = parsed.args.id as bigint;
+        leaf = parsed.args.leaf as string;
+        deadline = parsed.args.deadline as bigint;
+        callDataHash = parsed.args.callDataHash as string;
+        found = true;
+        break;
+      }
+    } catch { /* skip non-matching logs */ }
+  }
+
+  if (!found) {
+    throw new Error(`TransactionInitiated event not found for RealCrossChainBridge at ${bridgeAddress}`);
+  }
+
+  return { txHash: receipt.hash, blockNumber: receipt.blockNumber, id, leaf, deadline, callDataHash };
+}
+
+/**
+ * Execute real transaction on destination RealCrossChainBridge (pays out real native/ERC20 and/or executes target contract call).
+ */
+export async function executeRealBridgeTransaction(
+  destBridgeAddress: string,
+  destSigner: ethers.Signer,
+  sourceChainId: bigint,
+  header: BlockHeader,
+  proof: string[],
+  request: RealCrossChainRequest,
+  callData: string = "0x"
+): Promise<ethers.TransactionReceipt> {
+  const bridge = new ethers.Contract(destBridgeAddress, REAL_BRIDGE_ABI, destSigner);
+  const tx = await bridge.executeTransaction(sourceChainId, header, proof, request, callData);
+  const receipt = await tx.wait(1);
+  if (!receipt) throw new Error("executeRealBridgeTransaction: no receipt returned");
+  return receipt;
+}
+
 

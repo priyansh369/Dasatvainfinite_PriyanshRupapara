@@ -4,3 +4,5 @@ dist/
 artifacts/
 cache/
 typechain-types/
+gas-report.txt
+.hardhat-local/
