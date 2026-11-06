@@ -351,7 +351,7 @@ export async function rebuildTree(
   if (startBlock === undefined) {
     try {
       const curBlock = await config.n1Provider.getBlockNumber();
-      startBlock = Math.max(0, curBlock - 30_000);
+      startBlock = Math.max(0, curBlock - 2_000);
     } catch {
       startBlock = 0;
     }
@@ -372,7 +372,7 @@ export async function rebuildTree(
       rawLogs = await config.n1Provider.getLogs({
         address:   config.routerAddress,
         topics:    [[topicRequestCreated, topicTxInitiated]],
-        fromBlock: Math.max(0, curBlock - 3_000),
+        fromBlock: Math.max(0, curBlock - 500),
         toBlock:   "latest",
       });
     } catch {
@@ -413,17 +413,30 @@ export async function rebuildTree(
     } catch { /* skip */ }
   }
 
-  // Fallback: If logs missed any requests due to RPC indexing, query directly
+  // Fallback: If logs missed any requests due to RPC indexing/pruning, query contract directly
   if (totalRequests > entries.length) {
+    const existingIds = new Set(entries.map((e) => e.id.toString()));
+
+    // 1. Try RealCrossChainBridge direct state queries first
     try {
-      const routerContract = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
-      const existingIds = new Set(entries.map((e) => e.id.toString()));
+      const realBridge = new ethers.Contract(config.routerAddress, REAL_BRIDGE_ABI, config.n1Provider);
+      const net = await config.n1Provider.getNetwork();
       for (let i = 0; i < totalRequests; i++) {
         if (!existingIds.has(i.toString())) {
-          const [leaf, req] = await Promise.all([
-            routerContract.leaves(i),
-            routerContract.requests(i),
-          ]);
+          const req = await realBridge.outgoingRequests(i);
+          const leaf = await realBridge.computeLeaf(
+            net.chainId,
+            config.routerAddress,
+            req.destChainId,
+            BigInt(i),
+            req.sender,
+            req.recipient,
+            req.token,
+            req.amount,
+            req.targetCall,
+            req.callDataHash,
+            req.deadline
+          );
           entries.push({
             id: BigInt(i),
             leaf: leaf as string,
@@ -431,14 +444,38 @@ export async function rebuildTree(
               id: BigInt(i),
               sender: req.sender as string,
               recipient: req.recipient as string,
-              value: req.value as bigint,
+              value: req.amount as bigint,
               deadline: req.deadline as bigint,
             },
           });
         }
       }
-    } catch (e) {
-      console.warn("Direct contract leaf fallback failed:", e);
+    } catch {
+      // 2. Try legacy Router direct state queries
+      try {
+        const routerContract = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Provider);
+        for (let i = 0; i < totalRequests; i++) {
+          if (!existingIds.has(i.toString())) {
+            const [leaf, req] = await Promise.all([
+              routerContract.leaves(i),
+              routerContract.requests(i),
+            ]);
+            entries.push({
+              id: BigInt(i),
+              leaf: leaf as string,
+              request: {
+                id: BigInt(i),
+                sender: req.sender as string,
+                recipient: req.recipient as string,
+                value: req.value as bigint,
+                deadline: req.deadline as bigint,
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Direct contract leaf fallback failed:", e);
+      }
     }
   }
 
@@ -661,6 +698,8 @@ export const REAL_BRIDGE_ABI = [
   "function getLiquidity(address token) view returns (uint256)",
   "function depositLiquidity(address token, uint256 amount) payable",
   "function reclaim(uint256 id)",
+  "function outgoingRequests(uint256) view returns (address sender, address recipient, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, uint256 destChainId, bool reclaimed)",
+  "function computeLeaf(uint256 srcChainId, address srcBridge, uint256 dstChainId, uint256 id, address sender, address recipient, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline) pure returns (bytes32)",
   "error Expired(uint256 id, uint256 deadline, uint256 currentTimestamp)",
   "error InvalidProof(uint256 id)",
   "error AlreadyProcessed(uint256 sourceChainId, uint256 id)",
