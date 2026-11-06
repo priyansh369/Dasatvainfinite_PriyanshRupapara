@@ -189,10 +189,32 @@ export default function App() {
     }
   };
 
+  const HARDHAT_DEFAULT = "0x5FbDB2315678afecb367f032d93F642f64180aa3".toLowerCase();
+
   // Live RealCrossChainBridge contract addresses
   const [routerAddress, setRouterAddress] = useState<string>(DEFAULT_CONTRACTS.sepolia.realBridge);
   const [verifierAddress, setVerifierAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.realBridge);
   const [wrappedDemoAddress, setWrappedDemoAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.wrappedDemo);
+
+  // Auto-clean any stale hardhat address from browser cache
+  useEffect(() => {
+    if (routerAddress.toLowerCase() === HARDHAT_DEFAULT) {
+      setRouterAddress(DEFAULT_CONTRACTS.sepolia.realBridge);
+    }
+    if (verifierAddress.toLowerCase() === HARDHAT_DEFAULT) {
+      setVerifierAddress(DEFAULT_CONTRACTS.amoy.realBridge);
+    }
+  }, [routerAddress, verifierAddress]);
+
+  // Auto-recover from stale error screen
+  useEffect(() => {
+    if (errorMessage && errorMessage.includes("0x5FbDB")) {
+      setErrorMessage("");
+      setPhase("PHASE1_FORM");
+      setRouterAddress(DEFAULT_CONTRACTS.sepolia.realBridge);
+      setVerifierAddress(DEFAULT_CONTRACTS.amoy.realBridge);
+    }
+  }, [errorMessage]);
 
   // ── Dynamic Cross-Chain Route (ETH <-> POL Bidirectional) ────────────────
   const isAmoyToSepolia = sendCurrency === "POL" || (receiveCurrency === "ETH" && sendCurrency !== "ETH") || (chainId === 80002 && sendCurrency !== "ETH");
@@ -203,13 +225,21 @@ export default function App() {
   const sourceNetwork = NETWORKS[sourceNetworkKey];
   const destNetwork   = NETWORKS[destNetworkKey];
 
-  const currentSourceBridgeAddress = isAmoyToSepolia
-    ? (DEFAULT_CONTRACTS.amoy.realBridge || routerAddress)
-    : (DEFAULT_CONTRACTS.sepolia.realBridge || routerAddress);
+  const currentSourceBridgeAddress = useMemo(() => {
+    const defaultAddr = isAmoyToSepolia ? DEFAULT_CONTRACTS.amoy.realBridge : DEFAULT_CONTRACTS.sepolia.realBridge;
+    if (!routerAddress || routerAddress.toLowerCase() === HARDHAT_DEFAULT) {
+      return defaultAddr;
+    }
+    return isAmoyToSepolia ? (DEFAULT_CONTRACTS.amoy.realBridge || routerAddress) : routerAddress;
+  }, [isAmoyToSepolia, routerAddress]);
 
-  const currentDestBridgeAddress = isAmoyToSepolia
-    ? (DEFAULT_CONTRACTS.sepolia.realBridge || verifierAddress)
-    : (DEFAULT_CONTRACTS.amoy.realBridge || verifierAddress);
+  const currentDestBridgeAddress = useMemo(() => {
+    const defaultAddr = isAmoyToSepolia ? DEFAULT_CONTRACTS.sepolia.realBridge : DEFAULT_CONTRACTS.amoy.realBridge;
+    if (!verifierAddress || verifierAddress.toLowerCase() === HARDHAT_DEFAULT) {
+      return defaultAddr;
+    }
+    return isAmoyToSepolia ? (DEFAULT_CONTRACTS.sepolia.realBridge || verifierAddress) : verifierAddress;
+  }, [isAmoyToSepolia, verifierAddress]);
 
   // Dynamic presets based on currency
   const presets = useMemo(() => {
