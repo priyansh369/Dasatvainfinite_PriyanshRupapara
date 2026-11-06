@@ -166,6 +166,7 @@ export default function App() {
     setSendCurrency(oldRecv);
     setReceiveCurrency(oldSend);
     setExchangeAmount(receiveAmount || "1");
+    setTransferDirection((prev) => (prev === "sepolia-to-amoy" ? "amoy-to-sepolia" : "sepolia-to-amoy"));
   };
 
   // ── Unread History Notifications (Clears when user views logs) ───────────
@@ -196,6 +197,19 @@ export default function App() {
   const [verifierAddress, setVerifierAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.realBridge);
   const [wrappedDemoAddress, setWrappedDemoAddress] = useState<string>(DEFAULT_CONTRACTS.amoy.wrappedDemo);
 
+  // ── Explicit Transfer Direction State (Never mutated by MetaMask network switches!) ──
+  const [transferDirection, setTransferDirection] = useState<"sepolia-to-amoy" | "amoy-to-sepolia">("sepolia-to-amoy");
+  const isAmoyToSepolia = transferDirection === "amoy-to-sepolia";
+
+  // Active Route Snapshot (Locked when transfer begins in Phase 1)
+  const [activeTransferRoute, setActiveTransferRoute] = useState<{
+    sourceNetworkKey: "sepolia" | "amoy";
+    destNetworkKey: "sepolia" | "amoy";
+    sourceBridge: string;
+    destBridge: string;
+    isAmoyToSepolia: boolean;
+  } | null>(null);
+
   // Auto-clean any stale hardhat address from browser cache
   useEffect(() => {
     if (routerAddress.toLowerCase() === HARDHAT_DEFAULT) {
@@ -215,9 +229,6 @@ export default function App() {
       setVerifierAddress(DEFAULT_CONTRACTS.amoy.realBridge);
     }
   }, [errorMessage]);
-
-  // ── Dynamic Cross-Chain Route (ETH <-> POL Bidirectional) ────────────────
-  const isAmoyToSepolia = sendCurrency === "POL" || (receiveCurrency === "ETH" && sendCurrency !== "ETH") || (chainId === 80002 && sendCurrency !== "ETH");
 
   const sourceNetworkKey: "sepolia" | "amoy" = isAmoyToSepolia ? "amoy" : "sepolia";
   const destNetworkKey: "sepolia" | "amoy"   = isAmoyToSepolia ? "sepolia" : "amoy";
@@ -255,9 +266,13 @@ export default function App() {
   const selectSendCurrency = (code: string) => {
     setSendCurrency(code);
     if (code === "ETH") {
+      setTransferDirection("sepolia-to-amoy");
+      setReceiveCurrency("POL");
       setExchangeAmount("0.001");
     } else if (code === "POL") {
-      setExchangeAmount("0.005");
+      setTransferDirection("amoy-to-sepolia");
+      setReceiveCurrency("ETH");
+      setExchangeAmount("0.001");
     } else if (code === "INR") {
       setExchangeAmount("100");
     } else {
@@ -629,6 +644,16 @@ export default function App() {
 
       startStopwatch();
 
+      // Snapshot active route so Phase 2 is 100% resilient to network switches & state changes
+      const currentRoute = {
+        sourceNetworkKey,
+        destNetworkKey,
+        sourceBridge: currentSourceBridgeAddress,
+        destBridge: currentDestBridgeAddress,
+        isAmoyToSepolia,
+      };
+      setActiveTransferRoute(currentRoute);
+
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
 
       // Pre-flight validation: check if contract is actually deployed
@@ -770,31 +795,43 @@ export default function App() {
 
     // 🌐 Live Network Flow
     try {
+      const targetDestKey = activeTransferRoute?.destNetworkKey || destNetworkKey;
+      const targetDestNetwork = NETWORKS[targetDestKey];
+      const targetDestBridge = activeTransferRoute?.destBridge || currentDestBridgeAddress;
+      const targetSourceBridge = activeTransferRoute?.sourceBridge || currentSourceBridgeAddress;
+      const targetIsAmoyToSepolia = activeTransferRoute ? activeTransferRoute.isAmoyToSepolia : isAmoyToSepolia;
+
       // Ensure on destination network
-      const targetChainId = networkMode === "testnet" ? destNetwork.chainIdDec : 31337;
+      const targetChainId = networkMode === "testnet" ? targetDestNetwork.chainIdDec : 31337;
       if (chainId !== targetChainId) {
-        await switchNetwork(destNetworkKey);
+        await switchNetwork(targetDestKey);
         setIsBusy(false);
         return;
       }
 
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
+      const actualNet = await browserProvider.getNetwork();
+      if (Number(actualNet.chainId) !== targetChainId) {
+        await switchNetwork(targetDestKey);
+        setIsBusy(false);
+        return;
+      }
 
       // Pre-flight check: ensure destination Bridge contract is deployed
-      const verifierCode = await browserProvider.getCode(currentDestBridgeAddress);
+      const verifierCode = await browserProvider.getCode(targetDestBridge);
       if (!verifierCode || verifierCode === "0x" || verifierCode === "0x0") {
         throw new Error(
-          `No Bridge contract found at ${currentDestBridgeAddress} on ${destNetwork.name}. Please ensure your wallet is connected to ${destNetwork.name}.`
+          `No Bridge contract found at ${targetDestBridge} on ${targetDestNetwork.name}. Please ensure your wallet is connected to ${targetDestNetwork.name}.`
         );
       }
 
-      const sourceProvider = isAmoyToSepolia ? getN2Provider() : getN1Provider();
+      const sourceProvider = targetIsAmoyToSepolia ? getN2Provider() : getN1Provider();
 
       const config: CrossChainConfig = {
-        routerAddress: currentSourceBridgeAddress,
+        routerAddress: targetSourceBridge,
         n1Provider: sourceProvider,
         n1Signer: signer,
-        verifierAddress: currentDestBridgeAddress,
+        verifierAddress: targetDestBridge,
         n2Provider: browserProvider,
         n2Signer: signer,
       };
@@ -1897,20 +1934,20 @@ export default function App() {
             {/* Action Bar: Network Switch / Submit to Destination Network */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
               <div>
-                {chainId !== destNetwork.chainIdDec && (
+                {chainId !== (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].chainIdDec : destNetwork.chainIdDec) && (
                   <span style={{ fontSize: "13px", color: "var(--terracotta-400)" }}>
-                    ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to {destNetwork.name}.
+                    ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name}.
                   </span>
                 )}
               </div>
 
               <div style={{ display: "flex", gap: "12px" }}>
-                {chainId !== destNetwork.chainIdDec ? (
+                {chainId !== (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].chainIdDec : destNetwork.chainIdDec) ? (
                   <button
                     className="btn btn-polygon"
-                    onClick={() => switchNetwork(destNetworkKey)}
+                    onClick={() => switchNetwork(activeTransferRoute ? activeTransferRoute.destNetworkKey : destNetworkKey)}
                   >
-                    Switch to {destNetwork.name} ({destNetworkKey === "sepolia" ? "N1" : "N2"})
+                    Switch to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name} ({ (activeTransferRoute ? activeTransferRoute.destNetworkKey : destNetworkKey) === "sepolia" ? "N1" : "N2"})
                     <ArrowRight size={16} />
                   </button>
                 ) : (
@@ -1920,7 +1957,7 @@ export default function App() {
                     disabled={isBusy}
                   >
                     <Coins size={16} />
-                    {isBusy ? "Submitting Proof..." : `Submit Proof & Claim ${receiveCurrency || destNetwork.symbol}`}
+                    {isBusy ? "Submitting Proof..." : `Submit Proof & Claim ${receiveCurrency || (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].symbol : destNetwork.symbol)}`}
                   </button>
                 )}
               </div>

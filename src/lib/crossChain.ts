@@ -640,11 +640,51 @@ export async function submitToVerifier(
       destChainId: net.chainId,
     };
 
-    const tx = await realBridge.executeTransaction(sourceChainId, header, proof, req, "0x");
+    // Prepare gas parameters for destination chain (especially critical on Polygon Amoy)
+    const overrides: Record<string, any> = { gasLimit: 450000n };
+    try {
+      const feeData = await config.n2Provider.getFeeData();
+      if (net.chainId === 80002n) {
+        const minPriority = ethers.parseUnits("35", "gwei");
+        const priority = feeData.maxPriorityFeePerGas && feeData.maxPriorityFeePerGas > minPriority
+          ? feeData.maxPriorityFeePerGas
+          : minPriority;
+        const maxFee = feeData.maxFeePerGas && feeData.maxFeePerGas > priority
+          ? feeData.maxFeePerGas + ethers.parseUnits("15", "gwei")
+          : priority + ethers.parseUnits("15", "gwei");
+        overrides.maxPriorityFeePerGas = priority;
+        overrides.maxFeePerGas = maxFee;
+      } else if (feeData.gasPrice) {
+        overrides.gasPrice = (feeData.gasPrice * 120n) / 100n;
+      }
+    } catch (feeErr) {
+      console.warn("Could not fetch destination feeData:", feeErr);
+    }
+
+    // Pre-flight static call simulation to verify cryptographic validity before spending gas
+    try {
+      await realBridge.executeTransaction.staticCall(sourceChainId, header, proof, req, "0x");
+    } catch (simErr: any) {
+      console.error("executeTransaction staticCall simulation failed:", simErr);
+      throw new Error(parseContractError(simErr));
+    }
+
+    const tx = await realBridge.executeTransaction(sourceChainId, header, proof, req, "0x", overrides);
     const receipt = await tx.wait(1);
     if (!receipt) throw new Error("submitToVerifier: no receipt returned");
     return receipt;
   } catch (bridgeErr: any) {
+    // If bridgeErr is already a parsed contract error from simulation, rethrow directly
+    if (bridgeErr?.message && (
+      bridgeErr.message.includes("Insufficient") ||
+      bridgeErr.message.includes("Already") ||
+      bridgeErr.message.includes("Expired") ||
+      bridgeErr.message.includes("Invalid") ||
+      bridgeErr.message.includes("Wrong Destination")
+    )) {
+      throw bridgeErr;
+    }
+
     // 2. Fallback to legacy Verifier.verifyAndExecute
     try {
       const verifier = new ethers.Contract(config.verifierAddress, VERIFIER_ABI, config.n2Signer);
@@ -700,13 +740,14 @@ export const REAL_BRIDGE_ABI = [
   "function reclaim(uint256 id)",
   "function outgoingRequests(uint256) view returns (address sender, address recipient, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, uint256 destChainId, bool reclaimed)",
   "function computeLeaf(uint256 srcChainId, address srcBridge, uint256 dstChainId, uint256 id, address sender, address recipient, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline) pure returns (bytes32)",
-  "error Expired(uint256 id, uint256 deadline, uint256 currentTimestamp)",
+  "error Expired(uint256 id, uint256 deadline, uint256 currentTime)",
   "error InvalidProof(uint256 id)",
   "error AlreadyProcessed(uint256 sourceChainId, uint256 id)",
+  "error InsufficientLiquidity(address token, uint256 requested, uint256 available)",
   "error InsufficientVaultLiquidity(address token, uint256 available, uint256 required)",
   "error InvalidHeader()",
-  "error WrongDestinationChain(uint256 current, uint256 expected)",
-  "error UntrustedSourceChain(uint256 chainId)",
+  "error WrongDestinationChain(uint256 expectedChainId, uint256 receivedChainId)",
+  "error UntrustedSourceChain(uint256 sourceChainId)",
   "error CalldataHashMismatch(bytes32 expected, bytes32 actual)",
   "error TransferFailed()",
   "error ZeroAddress()",
@@ -714,6 +755,7 @@ export const REAL_BRIDGE_ABI = [
   "error RequestNotFound(uint256 id)",
   "error NotRequestSender()",
   "error AlreadyReclaimed(uint256 id)",
+  "error TooEarlyToReclaim(uint256 id, uint256 unlockTime, uint256 currentTime)",
   "error ReclaimTooEarly(uint256 id, uint256 reclaimableAfter, uint256 currentTimestamp)",
   "event TransactionInitiated(uint256 indexed id, address indexed sender, address indexed recipient, uint256 destChainId, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, bytes32 leaf, bytes32 newRoot)",
   "event TransactionExecuted(uint256 indexed id, uint256 indexed sourceChainId, address indexed recipient, address token, uint256 amount, address targetCall)",
@@ -749,13 +791,18 @@ export function parseContractError(err: any): string {
     return "Transaction Expired: This cross-chain transfer had a 1-hour validity window that has elapsed. Your funds are protected on-chain — click 'Reclaim Locked Funds' to receive them back in your wallet.";
   }
 
-  if (errorName === "InsufficientVaultLiquidity" || err.message?.includes("InsufficientVaultLiquidity")) {
+  if (
+    errorName === "InsufficientLiquidity" ||
+    errorName === "InsufficientVaultLiquidity" ||
+    err.message?.includes("InsufficientLiquidity") ||
+    err.message?.includes("InsufficientVaultLiquidity")
+  ) {
     const available = err.errorArgs?.available ? ethers.formatEther(err.errorArgs.available) : undefined;
-    const required = err.errorArgs?.required ? ethers.formatEther(err.errorArgs.required) : undefined;
-    if (available && required) {
-      return `Insufficient Vault Liquidity on destination: Vault has ${available}, but ${required} was requested. Please transfer a smaller amount (e.g. 0.001 - 0.04 POL/ETH) or deposit liquidity.`;
+    const requested = (err.errorArgs?.requested ?? err.errorArgs?.required) ? ethers.formatEther(err.errorArgs?.requested ?? err.errorArgs?.required) : undefined;
+    if (available && requested) {
+      return `Insufficient Vault Liquidity on destination: Vault has ${available}, but ${requested} was requested. Please transfer a smaller amount (e.g. 0.001 - 0.04 POL/ETH) or deposit liquidity.`;
     }
-    return "Insufficient Bridge Vault Liquidity: The destination vault currently does not have enough native coin to fulfill this amount. Please bridge a smaller amount or deposit vault liquidity.";
+    return "Insufficient Bridge Vault Liquidity: The destination vault currently does not have enough native coin to fulfill this amount. Please bridge a smaller calibrated amount or deposit vault liquidity.";
   }
 
   if (errorName === "AlreadyProcessed" || err.message?.includes("AlreadyProcessed")) {
@@ -766,7 +813,7 @@ export function parseContractError(err: any): string {
     return "Already Reclaimed: The locked funds for this transfer have already been refunded to your wallet.";
   }
 
-  if (errorName === "ReclaimTooEarly" || err.message?.includes("ReclaimTooEarly")) {
+  if (errorName === "TooEarlyToReclaim" || errorName === "ReclaimTooEarly" || err.message?.includes("TooEarlyToReclaim") || err.message?.includes("ReclaimTooEarly")) {
     return "Reclaim Too Early: Locked funds can only be reclaimed after the 1-hour expiration and grace period have lapsed.";
   }
 
