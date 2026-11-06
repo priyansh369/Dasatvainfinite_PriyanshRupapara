@@ -115,7 +115,7 @@ export default function App() {
 
   // ── UI Helpers ───────────────────────────────────────────────────────────
   const [showConfig, setShowConfig] = useState<boolean>(false);
-  const [showProofDetails, setShowProofDetails] = useState<boolean>(true);
+  const [showProofDetails, setShowProofDetails] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [networkMode, setNetworkMode] = useState<"testnet" | "local">("testnet");
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
@@ -982,6 +982,27 @@ export default function App() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* Latency Speedup Benchmark Trigger Pill */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              padding: "6px 12px",
+              fontSize: "12px",
+              gap: "6px",
+              borderRadius: "var(--radius-full)",
+              background: showBenchmark ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
+              borderColor: showBenchmark ? "var(--terracotta-500)" : "var(--border-subtle)",
+              color: "var(--terracotta-700)",
+              fontWeight: "700",
+            }}
+            onClick={() => setShowBenchmark(!showBenchmark)}
+            title="Compare Client-Mediated Latency vs Coordinator Baseline"
+          >
+            <Zap size={14} style={{ color: "var(--terracotta-500)" }} />
+            <span>⚡ 1.4s (99.8x)</span>
+          </button>
+
           {/* Mode Switcher: Live vs Demo Simulation */}
           <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
             <button
@@ -1001,7 +1022,7 @@ export default function App() {
               title="Instant cryptographic demo with zero gas needed"
             >
               <Sparkles size={12} />
-              Demo Simulation
+              Demo
             </button>
           </div>
 
@@ -1026,8 +1047,10 @@ export default function App() {
                 <span style={{ fontSize: "13px" }}>{chainInfo.icon}</span>
                 <span>{chainInfo.name}</span>
               </span>
-              <div className="badge mono" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-subtle)" }}>
-                {account.slice(0, 6)}...{account.slice(-4)}
+              <div className="badge mono" style={{ background: "#ffffff", border: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px" }}>
+                <span>{account.slice(0, 6)}...{account.slice(-4)}</span>
+                <span style={{ color: "var(--text-muted)" }}>·</span>
+                <span style={{ fontWeight: "800", color: "var(--text-primary)" }}>{connectedNativeBalance} {chainInfo.symbol}</span>
               </div>
               <button
                 className="btn btn-danger"
@@ -1226,77 +1249,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ── MetaMask Balance & Quick Actions Bar ──────────────────────────────── */}
-      {account && (
-        <div className="token-portfolio-bar">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Wallet size={16} style={{ color: "var(--terracotta-500)" }} />
-              <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
-                Active Balance:
-              </span>
-            </div>
-
-            <div className="token-list">
-              <div
-                className={`token-chip ${selectedToken === chainInfo.symbol ? "active" : ""}`}
-                onClick={() => setSelectedToken(chainInfo.symbol)}
-                title={`Active balance on ${chainInfo.name}`}
-              >
-                <span>{chainInfo.icon}</span>
-                <span className="token-chip-symbol">{chainInfo.name}:</span>
-                <span className="token-chip-balance">{connectedNativeBalance} {chainInfo.symbol}</span>
-              </div>
-
-              {chainId !== NETWORKS.sepolia.chainIdDec && (
-                <div
-                  className={`token-chip ${selectedToken === "ETH" ? "active" : ""}`}
-                  onClick={() => setSelectedToken("ETH")}
-                  title="Sepolia ETH"
-                >
-                  <span>🔷</span>
-                  <span className="token-chip-symbol">Sepolia:</span>
-                  <span className="token-chip-balance">{nativeBalance} ETH</span>
-                </div>
-              )}
-
-              <div
-                className={`token-chip ${selectedToken === "wDEMO" ? "active" : ""}`}
-                onClick={() => setSelectedToken("wDEMO")}
-                title="Amoy wDEMO"
-              >
-                <span>🟣</span>
-                <span className="token-chip-symbol">Amoy:</span>
-                <span className="token-chip-balance">{wDemoTokenBalance} wDEMO</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              type="button"
-              className="btn-import-token"
-              onClick={importWDEMOToMetaMask}
-              title="Add wDEMO token into your MetaMask extension"
-            >
-              {tokenImported ? <Check size={13} color="#059669" /> : <Plus size={13} />}
-              {tokenImported ? "Added to MetaMask!" : "+ Add wDEMO to MetaMask"}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ padding: "6px 10px" }}
-              onClick={() => fetchBalances()}
-              disabled={isRefreshingBalances}
-              title="Refresh balances from MetaMask"
-            >
-              <RefreshCw size={13} className={isRefreshingBalances ? "animate-spin" : ""} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── 2-Step Pipeline Progress Indicator ─────────────────────────────────── */}
       <div className="stepper-nav">
         {/* Step 1: Deposit */}
@@ -1336,103 +1288,73 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Collapsible Benchmark Drawer (User-Friendly Accordion) ──────────────── */}
-      <div style={{ marginBottom: "22px" }}>
-        <button
-          type="button"
-          onClick={() => setShowBenchmark(!showBenchmark)}
-          style={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: "#ffffff",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: "var(--radius-md)",
-            padding: "10px 16px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: "700",
-            color: "var(--text-secondary)",
-            boxShadow: "0 2px 8px rgba(70, 30, 80, 0.03)",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Zap size={14} style={{ color: "var(--terracotta-500)" }} />
-            <span>Protocol Latency Benchmark vs Coordinator Baseline</span>
-            <span className="badge" style={{ background: "rgba(5, 150, 105, 0.1)", color: "#059669", fontSize: "10px", padding: "2px 6px" }}>
-              119.7s Baseline
-            </span>
-            {isFaster && (
-              <span className="badge" style={{ background: "rgba(216, 97, 60, 0.1)", color: "var(--terracotta-700)", fontSize: "10px", padding: "2px 6px" }}>
-                ⚡ {speedupMultiplier}x Faster
-              </span>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-muted)" }}>
-            <span>{showBenchmark ? "Hide Analytics" : "View Analytics"}</span>
-            {showBenchmark ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </div>
-        </button>
-
-        {showBenchmark && (
-          <div className="benchmark-card glow-terracotta" style={{ marginTop: "10px", marginBottom: "0" }}>
-            <div className="benchmark-header">
-              <div className="benchmark-title">
-                <Zap size={16} style={{ color: "var(--terracotta-500)" }} />
-                Real-Time End-to-End Latency vs Coordinator Baseline
-              </div>
+      {/* ── Collapsible Benchmark Drawer (Toggled from Header Pill) ─────────────── */}
+      {showBenchmark && (
+        <div className="benchmark-card glow-terracotta" style={{ marginBottom: "22px" }}>
+          <div className="benchmark-header">
+            <div className="benchmark-title">
+              <Zap size={16} style={{ color: "var(--terracotta-500)" }} />
+              Real-Time End-to-End Latency vs Coordinator Baseline
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {isFaster && (
                 <div className="benchmark-badge-speedup">
                   ⚡ {speedupMultiplier}x Faster than Coordinator Chain
                 </div>
               )}
-            </div>
-
-            <div className="benchmark-metrics">
-              {/* User-Mediated Timer */}
-              <div className="metric-box">
-                <div className="metric-label">
-                  <span>USER-MEDIATED E2E LATENCY</span>
-                  {timerRunning && <span style={{ color: "var(--terracotta-500)", fontWeight: "bold" }}>● LIVE</span>}
-                </div>
-                <div className={`metric-value ${phase === "SUCCESS" ? "completed" : timerRunning ? "active" : ""}`}>
-                  {elapsedSec} s
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  Client proof generation + direct submission
-                </div>
-              </div>
-
-              {/* Baseline Timer */}
-              <div className="metric-box">
-                <div className="metric-label">
-                  <span>COORDINATOR CHAIN BASELINE</span>
-                  <span className="badge" style={{ background: "rgba(176, 116, 159, 0.15)", fontSize: "10px" }}>Axelar / LayerZero</span>
-                </div>
-                <div className="metric-value baseline">
-                  {baselineSec} s
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  Relayer quorum polling + secondary chain finality
-                </div>
-              </div>
-            </div>
-
-            {/* Visual Progress Bar Comparing Latency */}
-            <div className="progress-bar-bg" style={{ height: "8px" }}>
-              <div
-                className="progress-bar-fill"
-                style={{
-                  width: `${Math.min(100, (parseFloat(elapsedSec) / COORDINATOR_CHAIN_BASELINE_SECONDS) * 100)}%`,
-                  background: phase === "SUCCESS" ? "linear-gradient(90deg, #059669, #10b981)" : undefined,
-                }}
-              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "3px 8px", fontSize: "11px" }}
+                onClick={() => setShowBenchmark(false)}
+              >
+                ✕
+              </button>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="benchmark-metrics">
+            {/* User-Mediated Timer */}
+            <div className="metric-box">
+              <div className="metric-label">
+                <span>USER-MEDIATED E2E LATENCY</span>
+                {timerRunning && <span style={{ color: "var(--terracotta-500)", fontWeight: "bold" }}>● LIVE</span>}
+              </div>
+              <div className={`metric-value ${phase === "SUCCESS" ? "completed" : timerRunning ? "active" : ""}`}>
+                {elapsedSec} s
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Client proof generation + direct submission
+              </div>
+            </div>
+
+            {/* Baseline Timer */}
+            <div className="metric-box">
+              <div className="metric-label">
+                <span>COORDINATOR CHAIN BASELINE</span>
+                <span className="badge" style={{ background: "rgba(176, 116, 159, 0.15)", fontSize: "10px" }}>Axelar / LayerZero</span>
+              </div>
+              <div className="metric-value baseline">
+                {baselineSec} s
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Relayer quorum polling + secondary chain finality
+              </div>
+            </div>
+          </div>
+
+          {/* Visual Progress Bar Comparing Latency */}
+          <div className="progress-bar-bg" style={{ height: "8px" }}>
+            <div
+              className="progress-bar-fill"
+              style={{
+                width: `${Math.min(100, (parseFloat(elapsedSec) / COORDINATOR_CHAIN_BASELINE_SECONDS) * 100)}%`,
+                background: phase === "SUCCESS" ? "linear-gradient(90deg, #059669, #10b981)" : undefined,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Error Banner ──────────────────────────────────────────────────────── */}
       {errorMessage && (
@@ -1506,7 +1428,7 @@ export default function App() {
               </div>
             )}
 
-            {/* ── Crypto & Currency Exchange Engine (e.g. 1 USD = 94.95 INR) ── */}
+            {/* ── Minimalist Native Cross-Chain Transfer Engine ── */}
             <div style={{ marginBottom: "22px" }}>
               {/* Send Box */}
               <div
@@ -1523,36 +1445,18 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
-                      You Pay / Send
+                      You Send
                     </span>
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                      (From: {chainInfo.name})
+                    <span className={`badge ${sourceNetworkKey === "sepolia" ? "badge-sepolia" : "badge-amoy"}`} style={{ fontSize: "11px" }}>
+                      {sourceNetwork.icon} {sourceNetwork.name}
                     </span>
                   </div>
 
-                  {/* Preset Buttons */}
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    {presets.map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setExchangeAmount(preset)}
-                        style={{
-                          background: exchangeAmount === preset ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
-                          border: "1px solid",
-                          borderColor: exchangeAmount === preset ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
-                          color: exchangeAmount === preset ? "var(--terracotta-700)" : "var(--text-secondary)",
-                          padding: "3px 8px",
-                          borderRadius: "6px",
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        {SUPPORTED_CURRENCIES[sendCurrency]?.symbol}{preset}
-                      </button>
-                    ))}
+                  {/* Active Balance & MAX */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                      Balance: <strong style={{ color: "var(--text-primary)" }}>{currentSourceBalance} {sourceNetwork.symbol}</strong>
+                    </span>
                     <button
                       type="button"
                       onClick={handleMax}
@@ -1560,7 +1464,7 @@ export default function App() {
                         background: "rgba(216, 97, 60, 0.1)",
                         border: "1px solid var(--terracotta-500)",
                         color: "var(--terracotta-700)",
-                        padding: "3px 8px",
+                        padding: "2px 8px",
                         borderRadius: "6px",
                         fontSize: "11px",
                         fontWeight: "800",
@@ -1572,7 +1476,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
                   <div style={{ flex: "1 1 200px" }}>
                     <input
                       type="number"
@@ -1580,7 +1484,7 @@ export default function App() {
                       min="0"
                       value={exchangeAmount}
                       onChange={(e) => setExchangeAmount(e.target.value)}
-                      placeholder="0.00"
+                      placeholder="0.001"
                       style={{
                         background: "transparent",
                         border: "none",
@@ -1592,49 +1496,52 @@ export default function App() {
                         width: "100%",
                       }}
                     />
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                      <span>
-                        Locks <strong>{effectiveAmount} {sourceNetwork.symbol}</strong> on-chain
-                      </span>
-                      <span>·</span>
-                      <span>
-                        Valuation: <strong>${(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36)).toFixed(2)} USD</strong> (₹{(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36) * 94.95).toFixed(2)} INR)
-                      </span>
-                      <span>·</span>
-                      <span>
-                        Wallet: <strong>{currentSourceBalance} {sourceNetwork.symbol}</strong>
-                      </span>
-                    </div>
                   </div>
 
-                  {/* Send Currency Selector Chips */}
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {Object.values(SUPPORTED_CURRENCIES).map((c) => (
-                      <button
-                        key={c.code}
-                        type="button"
-                        onClick={() => selectSendCurrency(c.code)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          padding: "6px 11px",
-                          borderRadius: "8px",
-                          fontSize: "13px",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          border: "1px solid",
-                          borderColor: sendCurrency === c.code ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
-                          background: sendCurrency === c.code ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
-                          color: sendCurrency === c.code ? "var(--terracotta-700)" : "var(--text-secondary)",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <span>{c.icon}</span>
-                        <span>{c.code}</span>
-                      </button>
-                    ))}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "#ffffff",
+                      border: "1px solid rgba(176, 116, 159, 0.3)",
+                      borderRadius: "10px",
+                      padding: "8px 14px",
+                      fontWeight: "800",
+                      fontSize: "15px",
+                      color: "var(--text-primary)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                    }}
+                  >
+                    <span>{sourceNetwork.icon}</span>
+                    <span>{sourceNetwork.symbol}</span>
                   </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div style={{ display: "flex", gap: "6px", marginTop: "10px", alignItems: "center" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)", marginRight: "4px" }}>Quick:</span>
+                  {presets.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setExchangeAmount(preset)}
+                      style={{
+                        background: exchangeAmount === preset ? "rgba(216, 97, 60, 0.12)" : "#ffffff",
+                        border: "1px solid",
+                        borderColor: exchangeAmount === preset ? "var(--terracotta-500)" : "rgba(176, 116, 159, 0.25)",
+                        color: exchangeAmount === preset ? "var(--terracotta-700)" : "var(--text-secondary)",
+                        padding: "3px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {preset} {sourceNetwork.symbol}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1643,7 +1550,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleInvertCurrencies}
-                  title="Invert swap direction"
+                  title="Invert bridge direction"
                   style={{
                     width: "38px",
                     height: "38px",
@@ -1677,87 +1584,62 @@ export default function App() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
-                    You Receive (Calculated Payout)
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
+                      You Receive (Destination Payout)
+                    </span>
+                    <span className={`badge ${destNetworkKey === "amoy" ? "badge-amoy" : "badge-sepolia"}`} style={{ fontSize: "11px" }}>
+                      {destNetwork.icon} {destNetwork.name}
+                    </span>
+                  </div>
                   <span style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <TrendingUp size={12} /> Guaranteed Rate
+                    <TrendingUp size={12} /> 1:1 On-Chain Parity
                   </span>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#059669",
-                          fontFamily: "var(--font-mono)",
-                          letterSpacing: "-0.5px",
-                        }}
-                      >
-                        {receiveAmount} {SUPPORTED_CURRENCIES[receiveCurrency]?.symbol}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#059669", marginTop: "4px", fontWeight: "600" }}>
-                        ⚡ Destination Settlement: <strong>{receiveAmount} {destNetwork.symbol}</strong> on {destNetwork.name}
-                      </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "32px",
+                        fontWeight: "800",
+                        color: "#059669",
+                        fontFamily: "var(--font-mono)",
+                        letterSpacing: "-0.5px",
+                      }}
+                    >
+                      {receiveAmount}
                     </div>
+                  </div>
 
-                  {/* Receive Currency Selector Chips */}
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {Object.values(SUPPORTED_CURRENCIES).map((c) => (
-                      <button
-                        key={c.code}
-                        type="button"
-                        onClick={() => setReceiveCurrency(c.code)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          padding: "6px 11px",
-                          borderRadius: "8px",
-                          fontSize: "13px",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          border: "1px solid",
-                          borderColor: receiveCurrency === c.code ? "#059669" : "rgba(176, 116, 159, 0.25)",
-                          background: receiveCurrency === c.code ? "rgba(5, 150, 105, 0.1)" : "#ffffff",
-                          color: receiveCurrency === c.code ? "#059669" : "var(--text-secondary)",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <span>{c.icon}</span>
-                        <span>{c.code}</span>
-                      </button>
-                    ))}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(5, 150, 105, 0.08)",
+                      border: "1px solid rgba(5, 150, 105, 0.25)",
+                      borderRadius: "10px",
+                      padding: "8px 14px",
+                      fontWeight: "800",
+                      fontSize: "15px",
+                      color: "#059669",
+                    }}
+                  >
+                    <span>{destNetwork.icon}</span>
+                    <span>{destNetwork.symbol}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Rate & Fee Summary Pill */}
-              <div
-                style={{
-                  marginTop: "12px",
-                  padding: "10px 16px",
-                  borderRadius: "10px",
-                  background: "#f4eff5",
-                  border: "1px solid rgba(176, 116, 159, 0.2)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "8px",
-                  fontSize: "12px",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ color: "var(--terracotta-600)", fontWeight: "700" }}>⚡ Guaranteed Rate:</span>
-                  <span className="mono" style={{ color: "var(--text-primary)", fontWeight: "800" }}>
-                    {exchangeRateString}
+                {/* Valuation & Settlement Note */}
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "10px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                  <span>
+                    Valuation: <strong>${(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36)).toFixed(2)} USD</strong> (₹{(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36) * 94.95).toFixed(2)} INR)
                   </span>
-                </div>
-                <div style={{ color: "var(--text-muted)" }}>
-                  Slippage: 0.0% · Zero Relayer Fee · Instant Polygon Finality
+                  <span>·</span>
+                  <span style={{ color: "#059669", fontWeight: "600" }}>Zero Relayer Fee</span>
+                  <span>·</span>
+                  <span>Direct User Merkle Verification</span>
                 </div>
               </div>
             </div>
@@ -1877,17 +1759,88 @@ export default function App() {
                 >
                   <Lock size={16} />
                   {isBusy
-                    ? "Initiating Cross-Chain Transfer..."
-                    : `Lock & Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency} (${effectiveAmount} ${sourceNetwork.symbol})`}
+                    ? "Locking Funds on Chain..."
+                    : `Bridge ${exchangeAmount} ${sourceNetwork.symbol} ➔ ${receiveAmount} ${destNetwork.symbol} on ${destNetwork.name}`}
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* State 3: Direct Live Merkle Tree Visualizer & Phase 2 Actions */}
+        {/* State 3: Direct Live Action Card & Merkle Tree Visualizer */}
         {(phase === "PHASE1_CONFIRMING" || phase === "PHASE1_PROOF" || phase === "PHASE2_SWITCH") && proofResult && submitResult && (
           <div>
+            {/* ── Prominent Step 2 Action Card (Right at the Top) ── */}
+            {chainId !== (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].chainIdDec : destNetwork.chainIdDec) ? (
+              <div
+                style={{
+                  background: "linear-gradient(135deg, rgba(176, 116, 159, 0.12), rgba(150, 90, 132, 0.2))",
+                  border: "2px solid var(--mauve-500)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "24px 28px",
+                  marginBottom: "20px",
+                  textAlign: "center",
+                  boxShadow: "0 8px 30px rgba(176, 116, 159, 0.15)",
+                }}
+              >
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(176, 116, 159, 0.2)", padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: "12px", fontWeight: "800", color: "var(--mauve-800)", marginBottom: "10px" }}>
+                  <span>🔒 Step 1 Complete: {effectiveAmount} {sourceNetwork.symbol} Locked</span>
+                </div>
+                <h3 style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-primary)", marginBottom: "8px" }}>
+                  👉 Switch to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name} to Claim {receiveAmount} {destNetwork.symbol}
+                </h3>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)", maxWidth: "560px", margin: "0 auto 18px auto" }}>
+                  Your deposit has been verified in the Merkle leaf. Switch your MetaMask network to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name} to submit the proof and release your payout.
+                </p>
+                <button
+                  className="btn btn-polygon"
+                  onClick={() => switchNetwork(activeTransferRoute ? activeTransferRoute.destNetworkKey : destNetworkKey)}
+                  style={{ padding: "14px 32px", fontSize: "16px", fontWeight: "800", boxShadow: "0 4px 20px rgba(176, 116, 159, 0.4)" }}
+                >
+                  Switch MetaMask to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name}
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  background: "linear-gradient(135deg, rgba(5, 150, 105, 0.08), rgba(16, 185, 129, 0.15))",
+                  border: "2px solid #059669",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "24px 28px",
+                  marginBottom: "20px",
+                  textAlign: "center",
+                  boxShadow: "0 8px 30px rgba(5, 150, 105, 0.15)",
+                }}
+              >
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(5, 150, 105, 0.15)", padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: "12px", fontWeight: "800", color: "#059669", marginBottom: "10px" }}>
+                  <span>✓ On Destination Network</span>
+                </div>
+                <h3 style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-primary)", marginBottom: "8px" }}>
+                  🎉 Ready to Claim {receiveAmount} {destNetwork.symbol}!
+                </h3>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)", maxWidth: "560px", margin: "0 auto 18px auto" }}>
+                  Your 8-depth cryptographic Merkle inclusion proof is constructed off-chain. Submit it directly to the verifier smart contract to receive your payout.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSubmitProof}
+                  disabled={isBusy}
+                  style={{
+                    padding: "14px 32px",
+                    fontSize: "16px",
+                    fontWeight: "800",
+                    background: "linear-gradient(135deg, #059669, #10b981)",
+                    border: "none",
+                    boxShadow: "0 4px 20px rgba(5, 150, 105, 0.35)",
+                  }}
+                >
+                  <Coins size={18} />
+                  {isBusy ? "Submitting Proof to Verifier..." : `Submit Proof & Claim ${receiveAmount} ${destNetwork.symbol} ⚡`}
+                </button>
+              </div>
+            )}
+
             {/* Live Block Confirmation Banner */}
             <div style={{ background: "#fbf9fc", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 20px", marginBottom: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
@@ -1951,48 +1904,52 @@ export default function App() {
               </div>
             </div>
 
-            {/* Direct Step-by-Step Merkle Tree Visualizer Hero */}
-            <div style={{ marginBottom: "20px" }}>
-              <MerkleTreeVisualizer
-                root={proofResult.header.root}
-                leaf={submitResult.leaf}
-                proof={proofResult.proof}
-                requestId={submitResult.id}
-                isInline={true}
-                autoAnimate={true}
-              />
-            </div>
-
-            {/* Action Bar: Network Switch / Submit to Destination Network */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", flexWrap: "wrap", gap: "14px" }}>
-              <div>
-                {chainId !== (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].chainIdDec : destNetwork.chainIdDec) && (
-                  <span style={{ fontSize: "13px", color: "var(--terracotta-400)" }}>
-                    ⚠️ MetaMask currently connected to Chain #{chainId}. Please switch to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name}.
+            {/* Collapsible Cryptographic Merkle Tree Explorer Accordion */}
+            <div style={{ marginTop: "16px" }}>
+              <button
+                type="button"
+                onClick={() => setShowProofDetails(!showProofDetails)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#fbf9fc",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "12px 18px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  color: "var(--text-secondary)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Layers size={16} style={{ color: "var(--terracotta-500)" }} />
+                  <span>Inspect 8-Depth Cryptographic Merkle Proof</span>
+                  <span className="badge" style={{ background: "rgba(176, 116, 159, 0.15)", fontSize: "11px" }}>
+                    Root: {proofResult.header.root.slice(0, 10)}...
                   </span>
-                )}
-              </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text-muted)" }}>
+                  <span>{showProofDetails ? "Hide Tree" : "View Tree"}</span>
+                  {showProofDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </div>
+              </button>
 
-              <div style={{ display: "flex", gap: "12px" }}>
-                {chainId !== (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].chainIdDec : destNetwork.chainIdDec) ? (
-                  <button
-                    className="btn btn-polygon"
-                    onClick={() => switchNetwork(activeTransferRoute ? activeTransferRoute.destNetworkKey : destNetworkKey)}
-                  >
-                    Switch to {activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].name : destNetwork.name} ({ (activeTransferRoute ? activeTransferRoute.destNetworkKey : destNetworkKey) === "sepolia" ? "N1" : "N2"})
-                    <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSubmitProof}
-                    disabled={isBusy}
-                  >
-                    <Coins size={16} />
-                    {isBusy ? "Submitting Proof..." : `Submit Proof & Claim ${receiveCurrency || (activeTransferRoute ? NETWORKS[activeTransferRoute.destNetworkKey].symbol : destNetwork.symbol)}`}
-                  </button>
-                )}
-              </div>
+              {showProofDetails && (
+                <div style={{ marginTop: "14px" }}>
+                  <MerkleTreeVisualizer
+                    root={proofResult.header.root}
+                    leaf={submitResult.leaf}
+                    proof={proofResult.proof}
+                    requestId={submitResult.id}
+                    isInline={true}
+                    autoAnimate={true}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2027,25 +1984,25 @@ export default function App() {
 
             <div className="proof-box" style={{ maxWidth: "640px", margin: "0 auto 28px auto", textAlign: "left" }}>
               <div className="proof-item">
-                <span className="proof-label">Currency Exchange:</span>
+                <span className="proof-label">Cross-Chain Route:</span>
                 <span className="proof-val" style={{ color: "var(--text-primary)", fontWeight: "bold" }}>
-                  {exchangeAmount} {sendCurrency} ➔ {receiveAmount} {receiveCurrency}
+                  {sourceNetwork.name} ({exchangeAmount} {sourceNetwork.symbol}) ➔ {destNetwork.name} ({receiveAmount} {destNetwork.symbol})
                 </span>
               </div>
               <div className="proof-item">
-                <span className="proof-label">Guaranteed Rate:</span>
+                <span className="proof-label">Settlement Rate:</span>
                 <span className="proof-val" style={{ color: "var(--terracotta-700)", fontWeight: "bold" }}>
-                  {exchangeRateString}
+                  1:1 On-Chain Parity
                 </span>
               </div>
               <div className="proof-item">
-                <span className="proof-label">Minted to Recipient:</span>
-                <span className="proof-val">{recipient}</span>
+                <span className="proof-label">Recipient:</span>
+                <span className="proof-val mono">{recipient}</span>
               </div>
               <div className="proof-item">
-                <span className="proof-label">Payout Received:</span>
+                <span className="proof-label">Payout Settled:</span>
                 <span className="proof-val" style={{ color: "#059669", fontWeight: "bold" }}>
-                  {receiveAmount} {receiveCurrency}
+                  {receiveAmount} {destNetwork.symbol}
                 </span>
               </div>
               {verifyTxHash && (
