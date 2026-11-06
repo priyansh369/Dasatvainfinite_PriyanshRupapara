@@ -211,6 +211,50 @@ export default function App() {
     ? (DEFAULT_CONTRACTS.sepolia.realBridge || verifierAddress)
     : (DEFAULT_CONTRACTS.amoy.realBridge || verifierAddress);
 
+  // Dynamic presets based on currency
+  const presets = useMemo(() => {
+    if (sendCurrency === "ETH" || sendCurrency === "POL") {
+      return ["0.001", "0.002", "0.005", "0.01"];
+    }
+    if (sendCurrency === "INR") {
+      return ["50", "100", "500", "1000"];
+    }
+    return ["1", "5", "10", "20"];
+  }, [sendCurrency]);
+
+  const selectSendCurrency = (code: string) => {
+    setSendCurrency(code);
+    if (code === "ETH") {
+      setExchangeAmount("0.001");
+    } else if (code === "POL") {
+      setExchangeAmount("0.005");
+    } else if (code === "INR") {
+      setExchangeAmount("100");
+    } else {
+      setExchangeAmount("1");
+    }
+  };
+
+  const effectiveAmount = useMemo(() => {
+    if (sendCurrency === "ETH" || sendCurrency === "POL") {
+      return exchangeAmount || "0.001";
+    }
+    const rate = isAmoyToSepolia ? 0.36 : 2650;
+    const val = parseFloat(exchangeAmount || "0") / rate;
+    return (Math.max(0.0001, val)).toFixed(6);
+  }, [sendCurrency, exchangeAmount, isAmoyToSepolia]);
+
+  const currentSourceBalance = isAmoyToSepolia ? connectedNativeBalance : nativeBalance;
+  const isBalanceInsufficient = Boolean(
+    account &&
+    !isDemoMode &&
+    parseFloat(currentSourceBalance) > 0 &&
+    parseFloat(effectiveAmount) > parseFloat(currentSourceBalance)
+  );
+
+  const targetSourceChainId = networkMode === "testnet" ? sourceNetwork.chainIdDec : 31337;
+  const isWrongChain = chainId !== targetSourceChainId;
+
   // ── Token & Wallet Balances State ─────────────────────────────────────────
   const [connectedNativeBalance, setConnectedNativeBalance] = useState<string>("0.000");
   const [nativeBalance, setNativeBalance] = useState<string>("0.000");
@@ -334,19 +378,19 @@ export default function App() {
 
   const handleMax = () => {
     if (sendCurrency === "ETH") {
-      const maxVal = Math.max(0, parseFloat(nativeBalance) - 0.002);
-      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : nativeBalance);
+      const maxVal = Math.min(0.02, Math.max(0, parseFloat(nativeBalance) - 0.002));
+      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : "0.001");
     } else if (sendCurrency === "POL") {
-      const maxVal = Math.max(0, parseFloat(connectedNativeBalance) - 0.002);
-      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : connectedNativeBalance);
+      const maxVal = Math.min(0.02, Math.max(0, parseFloat(connectedNativeBalance) - 0.002));
+      setExchangeAmount(maxVal > 0 ? maxVal.toFixed(4) : "0.005");
     } else if (sendCurrency === "wDEMO") {
       setExchangeAmount(wDemoTokenBalance);
     } else if (sendCurrency === "USD") {
-      setExchangeAmount("100");
-    } else if (sendCurrency === "INR") {
-      setExchangeAmount("9495");
-    } else {
       setExchangeAmount("10");
+    } else if (sendCurrency === "INR") {
+      setExchangeAmount("500");
+    } else {
+      setExchangeAmount("1");
     }
   };
 
@@ -479,15 +523,6 @@ export default function App() {
     if (!account) return;
     setIsBusy(true);
     setErrorMessage("");
-
-    // Calculate effective native deposit for smart contract
-    let effectiveAmount = exchangeAmount;
-    if (sendCurrency === "ETH" || sendCurrency === "POL") {
-      effectiveAmount = exchangeAmount;
-    } else {
-      const rate = isAmoyToSepolia ? 0.36 : 2650;
-      effectiveAmount = (Math.max(0.0001, parseFloat(exchangeAmount) / rate)).toFixed(6);
-    }
 
     // 🎮 Demo Simulation Mode (Zero gas & instant execution)
     if (isDemoMode) {
@@ -1413,7 +1448,7 @@ export default function App() {
 
                   {/* Preset Buttons */}
                   <div style={{ display: "flex", gap: "6px" }}>
-                    {["1", "10", "100", "1000"].map((preset) => (
+                    {presets.map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -1473,6 +1508,9 @@ export default function App() {
                         width: "100%",
                       }}
                     />
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "3px" }}>
+                      ≈ Locks <strong>{effectiveAmount} {sourceNetwork.symbol}</strong> on {sourceNetwork.shortName} · Wallet Balance: <strong>{currentSourceBalance} {sourceNetwork.symbol}</strong>
+                    </div>
                   </div>
 
                   {/* Send Currency Selector Chips */}
@@ -1481,7 +1519,7 @@ export default function App() {
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => setSendCurrency(c.code)}
+                        onClick={() => selectSendCurrency(c.code)}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -1707,16 +1745,43 @@ export default function App() {
               )}
             </div>
 
+            {isBalanceInsufficient && (
+              <div style={{ color: "#ef4444", fontSize: "12px", marginBottom: "10px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                ⚠️ Insufficient balance: You have {currentSourceBalance} {sourceNetwork.symbol}, but trying to send {effectiveAmount} {sourceNetwork.symbol}. Click a preset (e.g. {presets[0]}) or MAX.
+              </div>
+            )}
+
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleLockEth}
-                disabled={isBusy || (!recipient && !account) || !exchangeAmount || parseFloat(exchangeAmount) <= 0}
-                style={{ padding: "14px 28px", fontSize: "15px", fontWeight: "700", width: "100%", boxShadow: "0 4px 18px var(--terracotta-glow)" }}
-              >
-                <Lock size={16} />
-                {isBusy ? "Initiating Cross-Chain Transfer..." : `Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency}`}
-              </button>
+              {isWrongChain ? (
+                <button
+                  type="button"
+                  className="btn btn-polygon"
+                  onClick={() => switchNetwork(sourceNetworkKey)}
+                  style={{ padding: "14px 28px", fontSize: "15px", fontWeight: "700", width: "100%" }}
+                >
+                  <ArrowRight size={16} />
+                  Switch MetaMask to {sourceNetwork.name}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleLockEth}
+                  disabled={
+                    isBusy ||
+                    (!recipient && !account) ||
+                    !exchangeAmount ||
+                    parseFloat(exchangeAmount) <= 0 ||
+                    isBalanceInsufficient
+                  }
+                  style={{ padding: "14px 28px", fontSize: "15px", fontWeight: "700", width: "100%", boxShadow: "0 4px 18px var(--terracotta-glow)" }}
+                >
+                  <Lock size={16} />
+                  {isBusy
+                    ? "Initiating Cross-Chain Transfer..."
+                    : `Lock & Exchange ${exchangeAmount} ${sendCurrency} ➔ ${receiveAmount} ${receiveCurrency} (${effectiveAmount} ${sourceNetwork.symbol})`}
+                </button>
+              )}
             </div>
           </div>
         )}
