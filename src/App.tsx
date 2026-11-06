@@ -126,30 +126,47 @@ export default function App() {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
 
-  // ── Currency Exchange Engine State (e.g. 1 USD = 94.95 INR) ─────────────
-  const [sendCurrency, setSendCurrency] = useState<string>("USD");
-  const [receiveCurrency, setReceiveCurrency] = useState<string>("INR");
-  const [exchangeAmount, setExchangeAmount] = useState<string>("1");
+  // ── Currency Exchange Engine State ─────────────────────────────────────────
+  const [sendCurrency, setSendCurrency] = useState<string>("ETH");
+  const [receiveCurrency, setReceiveCurrency] = useState<string>("POL");
+  const [exchangeAmount, setExchangeAmount] = useState<string>("0.001");
 
-  // Calculate live conversion
+  // Calculate live receive amount strictly matching on-chain cryptographic settlement
   const calculateReceiveAmount = (
     amountStr: string,
     fromCode: string,
     toCode: string
   ): string => {
     const val = parseFloat(amountStr);
-    if (isNaN(val) || val <= 0) return "0.00";
+    if (isNaN(val) || val <= 0) return "0.0000";
+
+    // When bridging native assets (ETH <-> POL), the on-chain bridge transfers 1:1 native value
+    if (
+      (fromCode === "ETH" && toCode === "POL") ||
+      (fromCode === "POL" && toCode === "ETH") ||
+      fromCode === toCode
+    ) {
+      return amountStr;
+    }
+
+    // For fiat-based currency conversions
     const fromRate = SUPPORTED_CURRENCIES[fromCode]?.usdRate || 1.0;
     const toRate = SUPPORTED_CURRENCIES[toCode]?.usdRate || 1.0;
     const converted = (val * fromRate) / toRate;
     if (converted >= 100) return converted.toFixed(2);
-    if (converted >= 1) return converted.toFixed(2);
-    return converted.toFixed(4);
+    if (converted >= 1) return converted.toFixed(4);
+    return converted.toFixed(6);
   };
 
   const receiveAmount = calculateReceiveAmount(exchangeAmount, sendCurrency, receiveCurrency);
 
   const exchangeRateString = useMemo(() => {
+    if (
+      (sendCurrency === "ETH" && receiveCurrency === "POL") ||
+      (sendCurrency === "POL" && receiveCurrency === "ETH")
+    ) {
+      return `1 ${sendCurrency} = 1 ${receiveCurrency} (1:1 On-Chain Bridge)`;
+    }
     const fromRate = SUPPORTED_CURRENCIES[sendCurrency]?.usdRate || 1.0;
     const toRate = SUPPORTED_CURRENCIES[receiveCurrency]?.usdRate || 1.0;
     const rate = fromRate / toRate;
@@ -165,7 +182,7 @@ export default function App() {
     const oldRecv = receiveCurrency;
     setSendCurrency(oldRecv);
     setReceiveCurrency(oldSend);
-    setExchangeAmount(receiveAmount || "1");
+    setExchangeAmount(exchangeAmount || "0.001");
     setTransferDirection((prev) => (prev === "sepolia-to-amoy" ? "amoy-to-sepolia" : "sepolia-to-amoy"));
   };
 
@@ -1575,8 +1592,18 @@ export default function App() {
                         width: "100%",
                       }}
                     />
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "3px" }}>
-                      ≈ Locks <strong>{effectiveAmount} {sourceNetwork.symbol}</strong> on {sourceNetwork.shortName} · Wallet Balance: <strong>{currentSourceBalance} {sourceNetwork.symbol}</strong>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                      <span>
+                        Locks <strong>{effectiveAmount} {sourceNetwork.symbol}</strong> on-chain
+                      </span>
+                      <span>·</span>
+                      <span>
+                        Valuation: <strong>${(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36)).toFixed(2)} USD</strong> (₹{(parseFloat(effectiveAmount || "0") * (sourceNetworkKey === "sepolia" ? 2650 : 0.36) * 94.95).toFixed(2)} INR)
+                      </span>
+                      <span>·</span>
+                      <span>
+                        Wallet: <strong>{currentSourceBalance} {sourceNetwork.symbol}</strong>
+                      </span>
                     </div>
                   </div>
 
@@ -1659,17 +1686,22 @@ export default function App() {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-                  <div
-                    style={{
-                      fontSize: "32px",
-                      fontWeight: "800",
-                      color: "#059669",
-                      fontFamily: "var(--font-mono)",
-                      letterSpacing: "-0.5px",
-                    }}
-                  >
-                    {receiveAmount} {SUPPORTED_CURRENCIES[receiveCurrency]?.symbol}
-                  </div>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "32px",
+                          fontWeight: "800",
+                          color: "#059669",
+                          fontFamily: "var(--font-mono)",
+                          letterSpacing: "-0.5px",
+                        }}
+                      >
+                        {receiveAmount} {SUPPORTED_CURRENCIES[receiveCurrency]?.symbol}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#059669", marginTop: "4px", fontWeight: "600" }}>
+                        ⚡ Destination Settlement: <strong>{receiveAmount} {destNetwork.symbol}</strong> on {destNetwork.name}
+                      </div>
+                    </div>
 
                   {/* Receive Currency Selector Chips */}
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
