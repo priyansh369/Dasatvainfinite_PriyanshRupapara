@@ -274,6 +274,14 @@ export default function App() {
     return (Math.max(0.0001, val)).toFixed(6);
   }, [sendCurrency, exchangeAmount, isAmoyToSepolia]);
 
+  // ── Token & Wallet Balances State ─────────────────────────────────────────
+  const [connectedNativeBalance, setConnectedNativeBalance] = useState<string>("0.000");
+  const [nativeBalance, setNativeBalance] = useState<string>("0.000");
+  const [wDemoTokenBalance, setWDemoTokenBalance] = useState<string>("0.000");
+  const [selectedToken, setSelectedToken] = useState<string>("ETH");
+  const [isRefreshingBalances, setIsRefreshingBalances] = useState<boolean>(false);
+  const [tokenImported, setTokenImported] = useState<boolean>(false);
+
   const currentSourceBalance = isAmoyToSepolia ? connectedNativeBalance : nativeBalance;
   const isBalanceInsufficient = Boolean(
     account &&
@@ -284,14 +292,6 @@ export default function App() {
 
   const targetSourceChainId = networkMode === "testnet" ? sourceNetwork.chainIdDec : 31337;
   const isWrongChain = chainId !== targetSourceChainId;
-
-  // ── Token & Wallet Balances State ─────────────────────────────────────────
-  const [connectedNativeBalance, setConnectedNativeBalance] = useState<string>("0.000");
-  const [nativeBalance, setNativeBalance] = useState<string>("0.000");
-  const [wDemoTokenBalance, setWDemoTokenBalance] = useState<string>("0.000");
-  const [selectedToken, setSelectedToken] = useState<string>("ETH");
-  const [isRefreshingBalances, setIsRefreshingBalances] = useState<boolean>(false);
-  const [tokenImported, setTokenImported] = useState<boolean>(false);
 
   // ── Timer Effect ─────────────────────────────────────────────────────────
   useEffect(() => {
