@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileJson,
+  RotateCcw,
 } from "lucide-react";
 import {
   BridgeTransaction,
@@ -32,6 +33,7 @@ interface TransactionHistoryModalProps {
   transactions: BridgeTransaction[];
   onTransactionsChange: (updated: BridgeTransaction[]) => void;
   onTriggerDemo?: () => void;
+  onReclaim?: (tx: BridgeTransaction) => Promise<void>;
 }
 
 export default function TransactionHistoryModal({
@@ -40,10 +42,12 @@ export default function TransactionHistoryModal({
   transactions,
   onTransactionsChange,
   onTriggerDemo,
+  onReclaim,
 }: TransactionHistoryModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "minted" | "locked" | "demo">("all");
   const [expandedProofTxId, setExpandedProofTxId] = useState<string | null>(null);
+  const [reclaimingTxId, setReclaimingTxId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
@@ -648,6 +652,23 @@ export default function TransactionHistoryModal({
                         >
                           <CheckCircle2 size={12} /> Minted
                         </span>
+                      ) : tx.status === "reclaimed" ? (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            padding: "3px 8px",
+                            borderRadius: "6px",
+                            background: "rgba(37, 99, 235, 0.1)",
+                            color: "#2563eb",
+                            border: "1px solid rgba(37, 99, 235, 0.3)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <RotateCcw size={12} /> Reclaimed
+                        </span>
                       ) : tx.status === "locked" ? (
                         <span
                           style={{
@@ -906,6 +927,38 @@ export default function TransactionHistoryModal({
                       >
                         <Download size={13} /> Export Proof (.json)
                       </button>
+
+                      {onReclaim && (tx.status === "locked" || tx.status === "failed") && (
+                        <button
+                          onClick={async () => {
+                            setReclaimingTxId(tx.id);
+                            try {
+                              await onReclaim(tx);
+                            } finally {
+                              setReclaimingTxId(null);
+                            }
+                          }}
+                          disabled={reclaimingTxId === tx.id}
+                          style={{
+                            background: "rgba(220, 38, 38, 0.08)",
+                            border: "1px solid rgba(220, 38, 38, 0.28)",
+                            color: "#dc2626",
+                            borderRadius: "8px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: reclaimingTxId === tx.id ? "not-allowed" : "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            transition: "all 0.2s",
+                          }}
+                          title="Reclaim locked funds back to source wallet"
+                        >
+                          <RotateCcw size={13} />
+                          {reclaimingTxId === tx.id ? "Reclaiming..." : "Reclaim Funds"}
+                        </button>
+                      )}
                     </div>
 
                     {tx.proofData && (

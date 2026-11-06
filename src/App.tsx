@@ -140,7 +140,7 @@ export default function App() {
     const val = parseFloat(amountStr);
     if (isNaN(val) || val <= 0) return "0.0000";
 
-    // When bridging native assets (ETH <-> POL), the on-chain bridge transfers 1:1 native value
+    // Cross-chain settlement for native testnet assets
     if (
       (fromCode === "ETH" && toCode === "POL") ||
       (fromCode === "POL" && toCode === "ETH") ||
@@ -165,7 +165,7 @@ export default function App() {
       (sendCurrency === "ETH" && receiveCurrency === "POL") ||
       (sendCurrency === "POL" && receiveCurrency === "ETH")
     ) {
-      return `1 ${sendCurrency} = 1 ${receiveCurrency} (1:1 On-Chain Bridge)`;
+      return `1 ${sendCurrency} = 1 ${receiveCurrency} (Direct Bridge)`;
     }
     const fromRate = SUPPORTED_CURRENCIES[sendCurrency]?.usdRate || 1.0;
     const toRate = SUPPORTED_CURRENCIES[receiveCurrency]?.usdRate || 1.0;
@@ -929,16 +929,83 @@ export default function App() {
     setIsBusy(true);
     setErrorMessage("");
     try {
-      if (chainId !== sourceNetwork.chainIdDec) {
-        await switchNetwork(sourceNetworkKey);
+      if (isDemoMode) {
+        if (activeTxId) {
+          updateTransaction(activeTxId, { status: "reclaimed" });
+          setTransactions(loadTransactions());
+        }
+        alert("Demo Simulation: Funds successfully refunded back to your demo balance!");
+        resetFlow();
+        return;
       }
-      const { signer } = await getBrowserSignerAndProvider();
-      await reclaimRequest(currentSourceBridgeAddress, signer, submitResult.id);
-      alert(`Successfully reclaimed locked funds from ${sourceNetwork.name}!`);
+
+      const activeRoute = activeTransferRoute;
+      const targetSourceKey = activeRoute ? activeRoute.sourceNetworkKey : sourceNetworkKey;
+      const targetSourceNet = NETWORKS[targetSourceKey];
+      const targetSourceBridge = activeRoute ? activeRoute.sourceBridge : currentSourceBridgeAddress;
+
+      if (chainId !== targetSourceNet.chainIdDec) {
+        await switchNetwork(targetSourceKey);
+      }
+
+      const { browserProvider, signer } = await getBrowserSignerAndProvider();
+      const actualNet = await browserProvider.getNetwork();
+      if (Number(actualNet.chainId) !== targetSourceNet.chainIdDec) {
+        setErrorMessage(`Please switch your MetaMask network to ${targetSourceNet.name} to confirm the refund transaction.`);
+        setIsBusy(false);
+        return;
+      }
+
+      await reclaimRequest(targetSourceBridge, signer, submitResult.id);
+      if (activeTxId) {
+        updateTransaction(activeTxId, { status: "reclaimed" });
+        setTransactions(loadTransactions());
+      }
+      alert(`Successfully reclaimed locked funds from ${targetSourceNet.name}!`);
       resetFlow();
       await fetchBalances();
     } catch (err: unknown) {
       setErrorMessage(parseContractError(err));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleHistoryReclaim = async (tx: BridgeTransaction) => {
+    try {
+      setIsBusy(true);
+      setErrorMessage("");
+      if (tx.isDemo) {
+        updateTransaction(tx.id, { status: "reclaimed" });
+        setTransactions(loadTransactions());
+        alert("Demo Simulation: Funds successfully refunded to your demo balance.");
+        return;
+      }
+
+      const isAmoySource = tx.sourceChain.id === 80002;
+      const targetKey: "sepolia" | "amoy" = isAmoySource ? "amoy" : "sepolia";
+      const targetNet = NETWORKS[targetKey];
+      const bridgeAddress = isAmoySource ? DEFAULT_CONTRACTS.amoy.realBridge : DEFAULT_CONTRACTS.sepolia.realBridge;
+
+      if (chainId !== targetNet.chainIdDec) {
+        await switchNetwork(targetKey);
+      }
+
+      const { browserProvider, signer } = await getBrowserSignerAndProvider();
+      const actualNet = await browserProvider.getNetwork();
+      if (Number(actualNet.chainId) !== targetNet.chainIdDec) {
+        alert(`Please switch MetaMask to ${targetNet.name} to reclaim this transaction.`);
+        return;
+      }
+
+      const reqId = BigInt(tx.id.replace(/\D/g, "") || "0");
+      await reclaimRequest(bridgeAddress, signer, reqId);
+      updateTransaction(tx.id, { status: "reclaimed" });
+      setTransactions(loadTransactions());
+      alert(`Successfully reclaimed locked funds on ${targetNet.name}!`);
+      await fetchBalances();
+    } catch (err: unknown) {
+      alert(parseContractError(err));
     } finally {
       setIsBusy(false);
     }
@@ -1611,7 +1678,7 @@ export default function App() {
                     </span>
                   </div>
                   <span style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <TrendingUp size={12} /> 1:1 On-Chain Parity
+                    <TrendingUp size={12} /> Guaranteed Rate
                   </span>
                 </div>
 
@@ -2010,7 +2077,7 @@ export default function App() {
               <div className="proof-item">
                 <span className="proof-label">Settlement Rate:</span>
                 <span className="proof-val" style={{ color: "var(--terracotta-700)", fontWeight: "bold" }}>
-                  1:1 On-Chain Parity
+                  Direct Settlement (Zero Slippage)
                 </span>
               </div>
               <div className="proof-item">
@@ -2202,6 +2269,7 @@ export default function App() {
             setIsDemoMode(true);
             resetFlow();
           }}
+          onReclaim={handleHistoryReclaim}
         />
       )}
 
@@ -2269,7 +2337,7 @@ export default function App() {
                 <span>🔒 Zero Relayer Attack Surface</span>
               </li>
               <li className="footer-link-item" style={{ cursor: "default" }}>
-                <span>💎 1:1 Non-Custodial Parity</span>
+                <span>💎 Non-Custodial Native Vaults</span>
               </li>
               <li className="footer-link-item" style={{ cursor: "default" }}>
                 <span>🛡️ Non-Reentrant Protection</span>

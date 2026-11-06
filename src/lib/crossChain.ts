@@ -748,6 +748,11 @@ export const REAL_BRIDGE_ABI = [
   "error InvalidHeader()",
   "error WrongDestinationChain(uint256 expectedChainId, uint256 receivedChainId)",
   "error UntrustedSourceChain(uint256 sourceChainId)",
+  "error TooEarlyToReclaim(uint256 id, uint256 unlockTime, uint256 currentTime)",
+  "error AlreadyReclaimed(uint256 id)",
+  "error ZeroAddress()",
+  "error ZeroAmount()",
+  "error TransferFailed()",
   "error CalldataHashMismatch(bytes32 expected, bytes32 actual)",
   "error TransferFailed()",
   "error ZeroAddress()",
@@ -813,8 +818,23 @@ export function parseContractError(err: any): string {
     return "Already Reclaimed: The locked funds for this transfer have already been refunded to your wallet.";
   }
 
-  if (errorName === "TooEarlyToReclaim" || errorName === "ReclaimTooEarly" || err.message?.includes("TooEarlyToReclaim") || err.message?.includes("ReclaimTooEarly")) {
-    return "Reclaim Too Early: Locked funds can only be reclaimed after the 1-hour expiration and grace period have lapsed.";
+  if (
+    errorName === "TooEarlyToReclaim" ||
+    errorName === "ReclaimTooEarly" ||
+    err.message?.includes("TooEarlyToReclaim") ||
+    err.message?.includes("ReclaimTooEarly")
+  ) {
+    const unlockTime = err.errorArgs?.unlockTime ?? err.errorArgs?.[1];
+    const currentTime = err.errorArgs?.currentTime ?? err.errorArgs?.[2];
+    if (unlockTime && currentTime) {
+      const unlockSec = Number(unlockTime);
+      const curSec = Number(currentTime);
+      const remainingSec = Math.max(0, unlockSec - curSec);
+      const remainingMin = Math.ceil(remainingSec / 60);
+      const unlockDate = new Date(unlockSec * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `Security Timelock Active: Funds cannot be reclaimed yet. This protocol timelock prevents cross-chain double-spending. Available in ~${remainingMin} min (at ${unlockDate}).`;
+    }
+    return "Security Timelock Active: Funds cannot be reclaimed immediately. The cross-chain contract enforces a timelock to guarantee non-double-spending before unlocking refunds.";
   }
 
   if (errorName === "InvalidProof" || err.message?.includes("InvalidProof")) {

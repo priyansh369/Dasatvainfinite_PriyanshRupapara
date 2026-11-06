@@ -16,7 +16,7 @@ export interface MerkleProofData {
 export interface BridgeTransaction {
   id: string; // unique request ID or demo ID
   timestamp: number;
-  status: "locked" | "minted" | "failed";
+  status: "locked" | "minted" | "failed" | "reclaimed";
   isDemo: boolean;
   amount: string;
   token: string;
@@ -132,7 +132,7 @@ export function exportProofToJson(tx: BridgeTransaction): void {
       token: tx.token,
       receiveAmount: tx.receiveAmount || tx.amount,
       receiveToken: tx.receiveToken || "wDEMO",
-      exchangeRate: tx.exchangeRate || "1:1",
+      exchangeRate: tx.exchangeRate || "Direct Bridge",
       sender: tx.sender || "N/A",
       recipient: tx.recipient,
       sourceChain: tx.sourceChain,
