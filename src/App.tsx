@@ -26,6 +26,8 @@ import {
   History,
   ArrowUpDown,
   TrendingUp,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 import {
@@ -52,6 +54,13 @@ import TransactionHistoryModal from "./components/TransactionHistoryModal";
 import ToastContainer, { ToastItem } from "./components/ToastContainer";
 import VaultsModal from "./components/VaultsModal";
 import { fireConfetti } from "./lib/confetti";
+import {
+  playClickSound,
+  playProofSound,
+  playSuccessSound,
+  isSoundEnabled,
+  setSoundEnabled,
+} from "./lib/sound";
 import {
   BridgeTransaction,
   loadTransactions,
@@ -133,6 +142,14 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => isSoundEnabled());
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabledState(next);
+    setSoundEnabled(next);
+    if (next) playClickSound();
+  };
 
   // ── Currency Exchange Engine State ─────────────────────────────────────────
   const [sendCurrency, setSendCurrency] = useState<string>("ETH");
@@ -186,6 +203,7 @@ export default function App() {
   }, [sendCurrency, receiveCurrency]);
 
   const handleInvertCurrencies = () => {
+    playClickSound();
     const oldSend = sendCurrency;
     const oldRecv = receiveCurrency;
     setSendCurrency(oldRecv);
@@ -289,6 +307,7 @@ export default function App() {
   }, [sendCurrency]);
 
   const selectSendCurrency = (code: string) => {
+    playClickSound();
     setSendCurrency(code);
     if (code === "ETH") {
       setTransferDirection("sepolia-to-amoy");
@@ -697,6 +716,7 @@ export default function App() {
         setTransactions(updatedTxs);
 
         // Immediately show the live step-by-step Merkle Tree Visualizer!
+        playProofSound();
         setPhase("PHASE1_PROOF");
 
         // Simulate block confirmations advancing in parallel
@@ -805,6 +825,7 @@ export default function App() {
       setTransactions(updatedTxs);
 
       // Immediately display live Merkle Tree step-by-step calculation!
+      playProofSound();
       setPhase("PHASE1_PROOF");
 
       // 3. Continue polling confirmations in background if needed
@@ -860,6 +881,7 @@ export default function App() {
 
         setPhase("SUCCESS");
         fireConfetti();
+        playSuccessSound();
         showToast(
           "success",
           "Demo Simulation Completed!",
@@ -958,6 +980,7 @@ export default function App() {
 
       setPhase("SUCCESS");
       fireConfetti();
+      playSuccessSound();
       showToast(
         "success",
         "Settlement Completed!",
@@ -1212,6 +1235,26 @@ export default function App() {
               Demo
             </button>
           </div>
+
+          {/* Web3 Audio Effects Toggle */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              padding: "5px 9px",
+              fontSize: "12px",
+              border: "1px solid var(--border-subtle)",
+              color: soundEnabled ? "var(--terracotta-600)" : "var(--text-muted)",
+              background: soundEnabled ? "rgba(216, 97, 60, 0.1)" : "rgba(255, 255, 255, 0.05)",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+            onClick={toggleSound}
+            title={soundEnabled ? "Mute Web3 Audio" : "Unmute Web3 Audio"}
+          >
+            {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+          </button>
 
           {account ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
