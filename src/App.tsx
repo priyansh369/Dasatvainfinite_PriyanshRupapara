@@ -519,7 +519,7 @@ export default function App() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(parseContractError(err));
     }
   };
 
@@ -619,7 +619,7 @@ export default function App() {
         await fetchBalances(accounts[0]);
       }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(parseContractError(err));
     } finally {
       setIsConnecting(false);
     }
@@ -657,10 +657,10 @@ export default function App() {
             ],
           });
         } catch (addError: unknown) {
-          setErrorMessage(addError instanceof Error ? addError.message : String(addError));
+          setErrorMessage(parseContractError(addError));
         }
       } else {
-        setErrorMessage(switchError instanceof Error ? switchError.message : String(switchError));
+        setErrorMessage(parseContractError(switchError));
       }
     }
   };
@@ -2534,6 +2534,12 @@ export default function App() {
             <h2 style={{ fontSize: "22px", fontWeight: "800", color: "#f87171", marginBottom: "8px" }}>
               {errorMessage?.includes("Expired")
                 ? "Transaction Validity Window Expired"
+                : errorMessage?.includes("Timelock")
+                ? "Refund Security Timelock Active"
+                : errorMessage?.includes("Cancelled")
+                ? "Transaction Cancelled in Wallet"
+                : errorMessage?.includes("Insufficient Gas")
+                ? "Insufficient Gas in Connected Wallet"
                 : errorMessage?.includes("Insufficient")
                 ? "Insufficient Destination Vault Liquidity"
                 : errorMessage?.includes("No Router") || errorMessage?.includes("bytecode")
@@ -2550,6 +2556,14 @@ export default function App() {
               {errorMessage?.includes("Expired") ? (
                 <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "#6ee7b7" }}>
                   ✅ <strong>Safe Refund:</strong> Your locked funds on {sourceNetwork.name} are fully protected on-chain. Click <strong>"Reclaim Locked Funds"</strong> below to claim them back to your wallet.
+                </div>
+              ) : errorMessage?.includes("Timelock") ? (
+                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "#6ee7b7" }}>
+                  🛡️ <strong>Protocol Protection Active:</strong> Your deposit is 100% safe inside the audited Sepolia Vault contract. Cross-chain protocols enforce a temporary timelock to guarantee the recipient cannot double-spend before the refund unlocks. Once the timelock elapses, clicking <strong>"Reclaim Locked Funds"</strong> will immediately disburse 100% of your funds back to your wallet.
+                </div>
+              ) : errorMessage?.includes("Cancelled") ? (
+                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "var(--mauve-200)" }}>
+                  💡 <strong>No Funds Lost:</strong> Because you cancelled or rejected the confirmation prompt in MetaMask, zero gas or funds were debited. You can click <strong>"Start Fresh Transfer"</strong> or retry whenever you're ready.
                 </div>
               ) : (
                 <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "var(--mauve-200)" }}>

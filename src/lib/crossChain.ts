@@ -674,18 +674,23 @@ export async function submitToVerifier(
     if (!receipt) throw new Error("submitToVerifier: no receipt returned");
     return receipt;
   } catch (bridgeErr: any) {
-    // If bridgeErr is already a parsed contract error from simulation, rethrow directly
-    if (bridgeErr?.message && (
-      bridgeErr.message.includes("Insufficient") ||
-      bridgeErr.message.includes("Already") ||
-      bridgeErr.message.includes("Expired") ||
-      bridgeErr.message.includes("Invalid") ||
-      bridgeErr.message.includes("Wrong Destination")
-    )) {
-      throw bridgeErr;
+    const parsed = parseContractError(bridgeErr);
+
+    // If user cancelled in MetaMask or the error is an actionable bridge error, rethrow directly
+    if (
+      bridgeErr?.code === "ACTION_REJECTED" ||
+      parsed.includes("Transaction Cancelled") ||
+      parsed.includes("Insufficient") ||
+      parsed.includes("Already") ||
+      parsed.includes("Expired") ||
+      parsed.includes("Invalid") ||
+      parsed.includes("Wrong Destination") ||
+      parsed.includes("Security Timelock")
+    ) {
+      throw new Error(parsed);
     }
 
-    // 2. Fallback to legacy Verifier.verifyAndExecute
+    // 2. Fallback to legacy Verifier.verifyAndExecute only for legacy deployments
     try {
       const verifier = new ethers.Contract(config.verifierAddress, VERIFIER_ABI, config.n2Signer);
       const tx       = await verifier.verifyAndExecute(header, proof, request);
@@ -693,7 +698,7 @@ export async function submitToVerifier(
       if (!receipt) throw new Error("submitToVerifier: no receipt for verifyAndExecute");
       return receipt;
     } catch {
-      throw new Error(parseContractError(bridgeErr));
+      throw new Error(parsed);
     }
   }
 }
@@ -706,8 +711,16 @@ export async function reclaimRequest(
   signer: ethers.Signer,
   id: bigint,
 ): Promise<ethers.TransactionReceipt> {
+  const bridge = new ethers.Contract(bridgeAddress, REAL_BRIDGE_ABI, signer);
+
+  // Pre-flight staticCall simulation to verify if timelock is active before opening wallet gas prompt
   try {
-    const bridge = new ethers.Contract(bridgeAddress, REAL_BRIDGE_ABI, signer);
+    await bridge.reclaim.staticCall(id);
+  } catch (simErr: any) {
+    throw new Error(parseContractError(simErr));
+  }
+
+  try {
     const tx = await bridge.reclaim(id);
     const receipt = await tx.wait(1);
     if (!receipt) throw new Error("reclaimRequest: no receipt for reclaim");
@@ -771,16 +784,75 @@ export const REAL_BRIDGE_ABI = [
 ] as const;
 
 /**
- * Parses smart contract errors into clear, actionable explanations.
+ * Parses smart contract and wallet errors into clear, actionable explanations.
  */
 export function parseContractError(err: any): string {
   if (!err) return "An unexpected error occurred.";
 
-  const errorName = err.errorName || err.shortMessage || "";
-  const rawData = err.data || err.error?.data || err.info?.error?.data;
+  // Extract nested error objects common in ethers v6 and MetaMask EIP-1193
+  const innerError = err.info?.error || err.error || err.cause;
+  const innerMsg = String(innerError?.message || err.message || "");
+  const innerCode = err.code ?? innerError?.code;
 
-  // Try parsing from raw hex data if errorName is not yet set
-  if (!errorName && typeof rawData === "string" && rawData.startsWith("0x")) {
+  // 1. User rejection / cancellation in MetaMask or wallet
+  if (
+    err.code === "ACTION_REJECTED" ||
+    innerCode === 4001 ||
+    innerCode === "ACTION_REJECTED" ||
+    innerMsg.toLowerCase().includes("user rejected") ||
+    innerMsg.toLowerCase().includes("user denied") ||
+    innerMsg.toLowerCase().includes("rejected the request") ||
+    innerMsg.toLowerCase().includes("action_rejected")
+  ) {
+    return "Transaction Cancelled: You rejected the prompt in MetaMask. No funds were spent. Click 'Start Fresh Transfer' or retry when you're ready.";
+  }
+
+  // 2. Insufficient gas funds in wallet
+  if (
+    innerMsg.toLowerCase().includes("insufficient funds") ||
+    innerMsg.toLowerCase().includes("gas * price + value") ||
+    innerMsg.toLowerCase().includes("exceeds balance") ||
+    innerMsg.toLowerCase().includes("insufficient balance for transfer")
+  ) {
+    return "Insufficient Gas in Wallet: Your wallet does not have enough native coin (ETH on Sepolia, or POL on Amoy) to pay the network gas fee. Please acquire a small faucet amount of gas to execute.";
+  }
+
+  // 3. Network or RPC issues
+  if (
+    innerMsg.toLowerCase().includes("rate limit") ||
+    innerMsg.toLowerCase().includes("too many requests") ||
+    innerMsg.toLowerCase().includes("request timed out") ||
+    innerMsg.toLowerCase().includes("failed to fetch")
+  ) {
+    return "Network RPC Latency: The public testnet RPC endpoint is temporarily busy or rate-limited. Please wait a few seconds and try again.";
+  }
+
+  // 4. Contract Custom Reverts & Data Decoding
+  // Only use err.errorName if it's an actual contract error name (not a generic ethers message)
+  let errorName = err.errorName || "";
+  if (
+    errorName.toLowerCase().includes("could not coalesce") ||
+    errorName.toLowerCase().includes("execution reverted") ||
+    errorName.toLowerCase().includes("unknown_error")
+  ) {
+    errorName = "";
+  }
+
+  // Extract raw hex data from any layer
+  let rawData: any =
+    err.data ||
+    err.error?.data ||
+    err.info?.error?.data ||
+    innerError?.data ||
+    (typeof err.data === "object" ? err.data?.data : undefined);
+
+  // If rawData is not directly found, check if it's embedded as hex in the error message
+  if (!rawData && typeof innerMsg === "string") {
+    const match = innerMsg.match(/0x[a-fA-F0-9]{8,}/);
+    if (match) rawData = match[0];
+  }
+
+  if (typeof rawData === "string" && rawData.startsWith("0x") && rawData.length >= 10) {
     try {
       const iface = new ethers.Interface(REAL_BRIDGE_ABI);
       const parsed = iface.parseError(rawData);
@@ -788,41 +860,48 @@ export function parseContractError(err: any): string {
         return parseContractError({ errorName: parsed.name, errorArgs: parsed.args });
       }
     } catch {
-      // ignore
+      // ignore parse failure
     }
   }
 
-  if (errorName === "Expired" || err.message?.includes("Expired") || (typeof rawData === "string" && rawData.startsWith("0xe40e4d39"))) {
+  // Check known custom errors
+  if (
+    errorName === "Expired" ||
+    innerMsg.includes("Expired") ||
+    (typeof rawData === "string" && rawData.startsWith("0xe40e4d39"))
+  ) {
     return "Transaction Expired: This cross-chain transfer had a 1-hour validity window that has elapsed. Your funds are protected on-chain — click 'Reclaim Locked Funds' to receive them back in your wallet.";
   }
 
   if (
     errorName === "InsufficientLiquidity" ||
     errorName === "InsufficientVaultLiquidity" ||
-    err.message?.includes("InsufficientLiquidity") ||
-    err.message?.includes("InsufficientVaultLiquidity")
+    innerMsg.includes("InsufficientLiquidity") ||
+    innerMsg.includes("InsufficientVaultLiquidity")
   ) {
     const available = err.errorArgs?.available ? ethers.formatEther(err.errorArgs.available) : undefined;
-    const requested = (err.errorArgs?.requested ?? err.errorArgs?.required) ? ethers.formatEther(err.errorArgs?.requested ?? err.errorArgs?.required) : undefined;
+    const requested = (err.errorArgs?.requested ?? err.errorArgs?.required)
+      ? ethers.formatEther(err.errorArgs?.requested ?? err.errorArgs?.required)
+      : undefined;
     if (available && requested) {
       return `Insufficient Vault Liquidity on destination: Vault has ${available}, but ${requested} was requested. Please transfer a smaller amount (e.g. 0.001 - 0.04 POL/ETH) or deposit liquidity.`;
     }
     return "Insufficient Bridge Vault Liquidity: The destination vault currently does not have enough native coin to fulfill this amount. Please bridge a smaller calibrated amount or deposit vault liquidity.";
   }
 
-  if (errorName === "AlreadyProcessed" || err.message?.includes("AlreadyProcessed")) {
+  if (errorName === "AlreadyProcessed" || innerMsg.includes("AlreadyProcessed")) {
     return "Already Executed: This transfer has already been completed and settled on the destination network.";
   }
 
-  if (errorName === "AlreadyReclaimed" || err.message?.includes("AlreadyReclaimed")) {
+  if (errorName === "AlreadyReclaimed" || innerMsg.includes("AlreadyReclaimed")) {
     return "Already Reclaimed: The locked funds for this transfer have already been refunded to your wallet.";
   }
 
   if (
     errorName === "TooEarlyToReclaim" ||
     errorName === "ReclaimTooEarly" ||
-    err.message?.includes("TooEarlyToReclaim") ||
-    err.message?.includes("ReclaimTooEarly")
+    innerMsg.includes("TooEarlyToReclaim") ||
+    innerMsg.includes("ReclaimTooEarly")
   ) {
     const unlockTime = err.errorArgs?.unlockTime ?? err.errorArgs?.[1];
     const currentTime = err.errorArgs?.currentTime ?? err.errorArgs?.[2];
@@ -837,16 +916,30 @@ export function parseContractError(err: any): string {
     return "Security Timelock Active: Funds cannot be reclaimed immediately. The cross-chain contract enforces a timelock to guarantee non-double-spending before unlocking refunds.";
   }
 
-  if (errorName === "InvalidProof" || err.message?.includes("InvalidProof")) {
+  if (errorName === "InvalidProof" || innerMsg.includes("InvalidProof")) {
     return "Invalid Merkle Proof: The cryptographic sibling path does not match the header root.";
   }
 
-  if (errorName === "WrongDestinationChain" || err.message?.includes("WrongDestinationChain")) {
+  if (errorName === "WrongDestinationChain" || innerMsg.includes("WrongDestinationChain")) {
     return "Wrong Destination Chain: Your connected wallet network does not match the transfer's destination chain.";
   }
 
-  if (errorName === "UntrustedSourceChain" || err.message?.includes("UntrustedSourceChain")) {
+  if (errorName === "UntrustedSourceChain" || innerMsg.includes("UntrustedSourceChain")) {
     return "Untrusted Source Chain: Bridge does not recognize the source chain ID.";
+  }
+
+  // 5. Catch ethers v6 "could not coalesce error"
+  const rawShortMsg = String(err.shortMessage || "").trim();
+  const rawFullMsg = String(err.message || "").trim();
+
+  if (
+    rawShortMsg.toLowerCase().includes("could not coalesce error") ||
+    rawFullMsg.toLowerCase().includes("could not coalesce error")
+  ) {
+    if (innerError?.message && !innerError.message.toLowerCase().includes("could not coalesce error")) {
+      return `Wallet Notice: ${innerError.message}`;
+    }
+    return "Wallet Prompt Notice: MetaMask was closed, rejected, or experienced a temporary RPC gas estimation hiccup. Your on-chain funds remain secure. Please retry or click 'Start Fresh Transfer'.";
   }
 
   if (err.reason) return err.reason;
