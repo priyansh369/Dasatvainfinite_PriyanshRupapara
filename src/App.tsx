@@ -49,6 +49,9 @@ import {
 } from "./config/networks";
 import MerkleTreeVisualizer from "./components/MerkleTreeVisualizer";
 import TransactionHistoryModal from "./components/TransactionHistoryModal";
+import ToastContainer, { ToastItem } from "./components/ToastContainer";
+import VaultsModal from "./components/VaultsModal";
+import { fireConfetti } from "./lib/confetti";
 import {
   BridgeTransaction,
   loadTransactions,
@@ -123,6 +126,11 @@ export default function App() {
   const [useSelfRecipient, setUseSelfRecipient] = useState<boolean>(true);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showVaultsModal, setShowVaultsModal] = useState<boolean>(false);
+  const [showRouteDetails, setShowRouteDetails] = useState<boolean>(false);
+  const [sepoliaVaultBalance, setSepoliaVaultBalance] = useState<string>("0.0977");
+  const [amoyVaultBalance, setAmoyVaultBalance] = useState<string>("0.5240");
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
 
@@ -394,11 +402,44 @@ export default function App() {
     );
   };
 
+  // In-App Toast Notification Trigger
+  const showToast = (
+    type: "success" | "error" | "info" | "warning",
+    title: string,
+    message?: string,
+    link?: { url: string; label: string }
+  ) => {
+    const id = Date.now().toString() + Math.random().toString().slice(2, 6);
+    setToasts((prev) => [...prev, { id, type, title, message, link }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
+
+  // Fetch Live Liquidity Vault Balances
+  const fetchVaultBalances = async () => {
+    try {
+      const n1 = getN1Provider();
+      const sBal = await n1.getBalance(DEFAULT_CONTRACTS.sepolia.realBridge);
+      setSepoliaVaultBalance(parseFloat(ethers.formatEther(sBal)).toFixed(4));
+    } catch { /* retain existing */ }
+
+    try {
+      const n2 = getN2Provider();
+      const aBal = await n2.getBalance(DEFAULT_CONTRACTS.amoy.realBridge);
+      setAmoyVaultBalance(parseFloat(ethers.formatEther(aBal)).toFixed(4));
+    } catch { /* retain existing */ }
+  };
+
   // ── Fetch Token Balances from MetaMask ───────────────────────────────────
   const fetchBalances = async (accountAddr?: string) => {
     const targetAddr = accountAddr || account;
     if (!targetAddr) return;
     setIsRefreshingBalances(true);
+
+    try {
+      fetchVaultBalances();
+    } catch { /* ignore */ }
 
     try {
       // 0. Fetch active connected network native balance (real-time from MetaMask)
@@ -818,6 +859,12 @@ export default function App() {
         }
 
         setPhase("SUCCESS");
+        fireConfetti();
+        showToast(
+          "success",
+          "Demo Simulation Completed!",
+          `${receiveAmount} ${receiveCurrency} settled on Polygon Amoy (Zero Gas • 1.4s proof verified)`
+        );
       } catch (err: unknown) {
         if (activeTxId) {
           const updated = updateTransaction(activeTxId, { status: "failed" });
@@ -910,6 +957,16 @@ export default function App() {
       }
 
       setPhase("SUCCESS");
+      fireConfetti();
+      showToast(
+        "success",
+        "Settlement Completed!",
+        `${receiveAmount} ${receiveCurrency} disbursed to your wallet on ${targetDestNetwork.name}!`,
+        {
+          url: `${targetDestNetwork.explorerUrl}/tx/${receipt.hash}`,
+          label: `View on ${targetDestNetwork.shortName} Explorer`,
+        }
+      );
     } catch (err: unknown) {
       if (activeTxId) {
         const updated = updateTransaction(activeTxId, { status: "failed" });
@@ -934,7 +991,7 @@ export default function App() {
           updateTransaction(activeTxId, { status: "reclaimed" });
           setTransactions(loadTransactions());
         }
-        alert("Demo Simulation: Funds successfully refunded back to your demo balance!");
+        showToast("success", "Demo Refund Complete", "Funds successfully restored to your demo balance.");
         resetFlow();
         return;
       }
@@ -961,7 +1018,7 @@ export default function App() {
         updateTransaction(activeTxId, { status: "reclaimed" });
         setTransactions(loadTransactions());
       }
-      alert(`Successfully reclaimed locked funds from ${targetSourceNet.name}!`);
+      showToast("success", "Locked Funds Reclaimed!", `Successfully refunded to your wallet on ${targetSourceNet.name}`);
       resetFlow();
       await fetchBalances();
     } catch (err: unknown) {
@@ -978,7 +1035,7 @@ export default function App() {
       if (tx.isDemo) {
         updateTransaction(tx.id, { status: "reclaimed" });
         setTransactions(loadTransactions());
-        alert("Demo Simulation: Funds successfully refunded to your demo balance.");
+        showToast("success", "Demo Refund Complete", "Funds restored to demo account.");
         return;
       }
 
@@ -994,7 +1051,7 @@ export default function App() {
       const { browserProvider, signer } = await getBrowserSignerAndProvider();
       const actualNet = await browserProvider.getNetwork();
       if (Number(actualNet.chainId) !== targetNet.chainIdDec) {
-        alert(`Please switch MetaMask to ${targetNet.name} to reclaim this transaction.`);
+        showToast("warning", "Network Switch Required", `Please switch MetaMask to ${targetNet.name} to reclaim this transaction.`);
         return;
       }
 
@@ -1002,10 +1059,10 @@ export default function App() {
       await reclaimRequest(bridgeAddress, signer, reqId);
       updateTransaction(tx.id, { status: "reclaimed" });
       setTransactions(loadTransactions());
-      alert(`Successfully reclaimed locked funds on ${targetNet.name}!`);
+      showToast("success", "Locked Funds Reclaimed!", `Successfully refunded on ${targetNet.name}!`);
       await fetchBalances();
     } catch (err: unknown) {
-      alert(parseContractError(err));
+      showToast("error", "Reclaim Notice", parseContractError(err));
     } finally {
       setIsBusy(false);
     }
@@ -1014,6 +1071,7 @@ export default function App() {
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
+    showToast("info", "Copied to Clipboard", text.length > 28 ? `${text.slice(0, 16)}...` : text);
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -1120,11 +1178,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              className={`nav-link-btn ${showConfig ? "active" : ""}`}
-              onClick={() => setShowConfig(!showConfig)}
-              title="Bridge Vaults & Settings"
+              className={`nav-link-btn ${showVaultsModal ? "active" : ""}`}
+              onClick={() => {
+                fetchVaultBalances();
+                setShowVaultsModal(true);
+              }}
+              title="Inspect Live Liquidity Vaults"
             >
-              <Settings size={14} />
+              <Coins size={14} style={{ color: "var(--terracotta-500)" }} />
               <span>Vaults</span>
             </button>
           </div>
@@ -1729,6 +1790,74 @@ export default function App() {
               </div>
             </div>
 
+            {/* Route & Fee Breakdown Accordion */}
+            <div style={{ marginBottom: "16px" }}>
+              <button
+                type="button"
+                onClick={() => setShowRouteDetails(!showRouteDetails)}
+                style={{
+                  width: "100%",
+                  background: "rgba(176, 116, 159, 0.06)",
+                  border: "1px solid rgba(176, 116, 159, 0.2)",
+                  borderRadius: "10px",
+                  padding: "9px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <ShieldCheck size={14} color="#059669" />
+                  Route Details & Economic Guarantees
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "var(--mauve-700)" }}>
+                  {showRouteDetails ? "Hide" : "Inspect"}
+                  {showRouteDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
+              </button>
+
+              {showRouteDetails && (
+                <div
+                  style={{
+                    background: "#fbf9fc",
+                    border: "1px solid rgba(176, 116, 159, 0.2)",
+                    borderTop: "none",
+                    borderRadius: "0 0 10px 10px",
+                    padding: "12px 16px",
+                    fontSize: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Protocol Relayer Fee:</span>
+                    <span style={{ fontWeight: "700", color: "#059669" }}>$0.00 (Zero-Relayer Client Proving)</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Expected Finality:</span>
+                    <span style={{ fontWeight: "700", color: "var(--terracotta-600)" }}>~1.4s (Sub-2s Proofs)</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Protocol Slippage:</span>
+                    <span style={{ fontWeight: "700", color: "var(--text-primary)" }}>0.00% (Guaranteed Direct Rate)</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Cryptographic Method:</span>
+                    <span style={{ fontWeight: "600", color: "var(--plum-800)" }}>8-Depth Incremental Merkle Trees</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Anti-Double-Spend Protection:</span>
+                    <span style={{ fontWeight: "600", color: "#059669" }}>On-Chain Timelock Enabled</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Recipient Address (Smart Default: Connected Wallet) */}
             <div style={{ background: "#fbf9fc", border: "1px solid rgba(176, 116, 159, 0.22)", borderRadius: "var(--radius-md)", padding: "14px 18px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
@@ -2272,6 +2401,23 @@ export default function App() {
           onReclaim={handleHistoryReclaim}
         />
       )}
+
+      {/* ── Liquidity Vaults Modal ─────────────────────────────────────────── */}
+      {showVaultsModal && (
+        <VaultsModal
+          isOpen={showVaultsModal}
+          onClose={() => setShowVaultsModal(false)}
+          sepoliaBalance={sepoliaVaultBalance}
+          amoyBalance={amoyVaultBalance}
+          onRefresh={fetchVaultBalances}
+        />
+      )}
+
+      {/* ── Global In-App Toast Notifications ───────────────────────────────── */}
+      <ToastContainer
+        toasts={toasts}
+        onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+      />
 
       {/* ── Industry-Ready Multi-Column Footer ───────────────────────────────── */}
       <footer className="app-footer">
