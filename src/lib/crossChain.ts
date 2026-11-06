@@ -230,7 +230,7 @@ export async function submitRequest(
       const router = new ethers.Contract(config.routerAddress, ROUTER_ABI, config.n1Signer);
       tx = await router.initiateRequest(recipient, { value });
     } catch {
-      throw bridgeErr;
+      throw new Error(parseContractError(bridgeErr));
     }
   }
 
@@ -616,24 +616,36 @@ export async function submitToVerifier(
       if (!receipt) throw new Error("submitToVerifier: no receipt for verifyAndExecute");
       return receipt;
     } catch {
-      throw bridgeErr;
+      throw new Error(parseContractError(bridgeErr));
     }
   }
 }
 
 /**
- * Reclaim locked ETH on N1 if deadline + 1 hour has expired and request was not executed.
+ * Reclaim locked funds on source chain if deadline has expired and request was not executed.
  */
 export async function reclaimRequest(
-  routerAddress: string,
+  bridgeAddress: string,
   signer: ethers.Signer,
   id: bigint,
 ): Promise<ethers.TransactionReceipt> {
-  const router  = new ethers.Contract(routerAddress, ROUTER_ABI, signer);
-  const tx      = await router.reclaim(id);
-  const receipt = await tx.wait(1);
-  if (!receipt) throw new Error("reclaimRequest: no receipt for reclaim");
-  return receipt;
+  try {
+    const bridge = new ethers.Contract(bridgeAddress, REAL_BRIDGE_ABI, signer);
+    const tx = await bridge.reclaim(id);
+    const receipt = await tx.wait(1);
+    if (!receipt) throw new Error("reclaimRequest: no receipt for reclaim");
+    return receipt;
+  } catch (err: any) {
+    try {
+      const router = new ethers.Contract(bridgeAddress, ROUTER_ABI, signer);
+      const tx = await router.reclaim(id);
+      const receipt = await tx.wait(1);
+      if (!receipt) throw new Error("reclaimRequest: no receipt for reclaim");
+      return receipt;
+    } catch {
+      throw new Error(parseContractError(err));
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -649,6 +661,21 @@ export const REAL_BRIDGE_ABI = [
   "function getLiquidity(address token) view returns (uint256)",
   "function depositLiquidity(address token, uint256 amount) payable",
   "function reclaim(uint256 id)",
+  "error Expired(uint256 id, uint256 deadline, uint256 currentTimestamp)",
+  "error InvalidProof(uint256 id)",
+  "error AlreadyProcessed(uint256 sourceChainId, uint256 id)",
+  "error InsufficientVaultLiquidity(address token, uint256 available, uint256 required)",
+  "error InvalidHeader()",
+  "error WrongDestinationChain(uint256 current, uint256 expected)",
+  "error UntrustedSourceChain(uint256 chainId)",
+  "error CalldataHashMismatch(bytes32 expected, bytes32 actual)",
+  "error TransferFailed()",
+  "error ZeroAddress()",
+  "error ZeroAmount()",
+  "error RequestNotFound(uint256 id)",
+  "error NotRequestSender()",
+  "error AlreadyReclaimed(uint256 id)",
+  "error ReclaimTooEarly(uint256 id, uint256 reclaimableAfter, uint256 currentTimestamp)",
   "event TransactionInitiated(uint256 indexed id, address indexed sender, address indexed recipient, uint256 destChainId, address token, uint256 amount, address targetCall, bytes32 callDataHash, uint256 deadline, bytes32 leaf, bytes32 newRoot)",
   "event TransactionExecuted(uint256 indexed id, uint256 indexed sourceChainId, address indexed recipient, address token, uint256 amount, address targetCall)",
   "event TargetCallExecuted(uint256 indexed id, address indexed targetCall, bool success, bytes returnData)",
@@ -656,6 +683,71 @@ export const REAL_BRIDGE_ABI = [
   "event LiquidityAdded(address indexed provider, address indexed token, uint256 amount)",
   "event LiquidityWithdrawn(address indexed to, address indexed token, uint256 amount)"
 ] as const;
+
+/**
+ * Parses smart contract errors into clear, actionable explanations.
+ */
+export function parseContractError(err: any): string {
+  if (!err) return "An unexpected error occurred.";
+
+  const errorName = err.errorName || err.shortMessage || "";
+  const rawData = err.data || err.error?.data || err.info?.error?.data;
+
+  // Try parsing from raw hex data if errorName is not yet set
+  if (!errorName && typeof rawData === "string" && rawData.startsWith("0x")) {
+    try {
+      const iface = new ethers.Interface(REAL_BRIDGE_ABI);
+      const parsed = iface.parseError(rawData);
+      if (parsed) {
+        return parseContractError({ errorName: parsed.name, errorArgs: parsed.args });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (errorName === "Expired" || err.message?.includes("Expired") || (typeof rawData === "string" && rawData.startsWith("0xe40e4d39"))) {
+    return "Transaction Expired: This cross-chain transfer had a 1-hour validity window that has elapsed. Your funds are protected on-chain — click 'Reclaim Locked Funds' to receive them back in your wallet.";
+  }
+
+  if (errorName === "InsufficientVaultLiquidity" || err.message?.includes("InsufficientVaultLiquidity")) {
+    const available = err.errorArgs?.available ? ethers.formatEther(err.errorArgs.available) : undefined;
+    const required = err.errorArgs?.required ? ethers.formatEther(err.errorArgs.required) : undefined;
+    if (available && required) {
+      return `Insufficient Vault Liquidity on destination: Vault has ${available}, but ${required} was requested. Please transfer a smaller amount (e.g. 0.001 - 0.04 POL/ETH) or deposit liquidity.`;
+    }
+    return "Insufficient Bridge Vault Liquidity: The destination vault currently does not have enough native coin to fulfill this amount. Please bridge a smaller amount or deposit vault liquidity.";
+  }
+
+  if (errorName === "AlreadyProcessed" || err.message?.includes("AlreadyProcessed")) {
+    return "Already Executed: This transfer has already been completed and settled on the destination network.";
+  }
+
+  if (errorName === "AlreadyReclaimed" || err.message?.includes("AlreadyReclaimed")) {
+    return "Already Reclaimed: The locked funds for this transfer have already been refunded to your wallet.";
+  }
+
+  if (errorName === "ReclaimTooEarly" || err.message?.includes("ReclaimTooEarly")) {
+    return "Reclaim Too Early: Locked funds can only be reclaimed after the 1-hour expiration and grace period have lapsed.";
+  }
+
+  if (errorName === "InvalidProof" || err.message?.includes("InvalidProof")) {
+    return "Invalid Merkle Proof: The cryptographic sibling path does not match the header root.";
+  }
+
+  if (errorName === "WrongDestinationChain" || err.message?.includes("WrongDestinationChain")) {
+    return "Wrong Destination Chain: Your connected wallet network does not match the transfer's destination chain.";
+  }
+
+  if (errorName === "UntrustedSourceChain" || err.message?.includes("UntrustedSourceChain")) {
+    return "Untrusted Source Chain: Bridge does not recognize the source chain ID.";
+  }
+
+  if (err.reason) return err.reason;
+  if (err.shortMessage) return err.shortMessage;
+  if (err.message) return err.message;
+  return String(err);
+}
 
 export interface RealCrossChainRequest {
   id: bigint;

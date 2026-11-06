@@ -35,6 +35,7 @@ import {
   submitToVerifier,
   reclaimRequest,
   buildDemoProof,
+  parseContractError,
   CrossChainConfig,
   ProofResult,
   SubmitResult,
@@ -648,7 +649,7 @@ export default function App() {
         ).catch(console.warn);
       }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(parseContractError(err));
       stopStopwatch();
       setPhase("FAILED");
     } finally {
@@ -773,7 +774,7 @@ export default function App() {
         const updated = updateTransaction(activeTxId, { status: "failed" });
         setTransactions(updated);
       }
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(parseContractError(err));
       stopStopwatch();
       setPhase("FAILED");
     } finally {
@@ -787,15 +788,16 @@ export default function App() {
     setIsBusy(true);
     setErrorMessage("");
     try {
-      if (chainId !== NETWORKS.sepolia.chainIdDec) {
-        await switchNetwork("sepolia");
+      if (chainId !== sourceNetwork.chainIdDec) {
+        await switchNetwork(sourceNetworkKey);
       }
       const { signer } = await getBrowserSignerAndProvider();
-      await reclaimRequest(routerAddress, signer, submitResult.id);
-      alert("Successfully reclaimed locked ETH!");
-      setPhase("PHASE1_FORM");
+      await reclaimRequest(currentSourceBridgeAddress, signer, submitResult.id);
+      alert(`Successfully reclaimed locked funds from ${sourceNetwork.name}!`);
+      resetFlow();
+      await fetchBalances();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(parseContractError(err));
     } finally {
       setIsBusy(false);
     }
@@ -1969,7 +1971,11 @@ export default function App() {
               <HelpCircle size={28} color="#ef4444" />
             </div>
             <h2 style={{ fontSize: "22px", fontWeight: "800", color: "#f87171", marginBottom: "8px" }}>
-              {errorMessage?.includes("No Router") || errorMessage?.includes("bytecode") || errorMessage?.includes("No RequestCreated")
+              {errorMessage?.includes("Expired")
+                ? "Transaction Validity Window Expired"
+                : errorMessage?.includes("Insufficient")
+                ? "Insufficient Destination Vault Liquidity"
+                : errorMessage?.includes("No Router") || errorMessage?.includes("bytecode")
                 ? "Contract Not Deployed on This Network"
                 : "Transaction Issue Detected"}
             </h2>
@@ -1980,37 +1986,43 @@ export default function App() {
               <div className="mono" style={{ fontSize: "12px", color: "var(--text-muted)", wordBreak: "break-word", lineHeight: 1.5 }}>
                 {errorMessage || "An unexpected error occurred during execution."}
               </div>
-              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "var(--mauve-200)" }}>
-                💡 <strong>Instant Solution:</strong> Click <strong>"Switch to Demo Simulation Mode"</strong> below to execute the complete cryptographic cross-chain transfer (Merkle proof generation + verification) instantly with zero gas!
-              </div>
+              {errorMessage?.includes("Expired") ? (
+                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "#6ee7b7" }}>
+                  ✅ <strong>Safe Refund:</strong> Your locked funds on {sourceNetwork.name} are fully protected on-chain. Click <strong>"Reclaim Locked Funds"</strong> below to claim them back to your wallet.
+                </div>
+              ) : (
+                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: "13px", color: "var(--mauve-200)" }}>
+                  💡 <strong>Recommendation:</strong> Click <strong>"Start Fresh Transfer"</strong> to initiate a new live transaction with smaller test amounts (e.g. 0.001 ETH / POL), or click <strong>"Switch to Demo Simulation Mode"</strong> for instant zero-gas execution.
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              {submitResult && (
+                <button className="btn btn-danger" onClick={handleReclaim} disabled={isBusy}>
+                  <RotateCcw size={16} />
+                  {isBusy ? "Reclaiming..." : `Reclaim Locked Funds (${sourceNetwork.shortName})`}
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={resetFlow}>
+                <RotateCcw size={16} /> Start Fresh Transfer
+              </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-secondary"
                 onClick={() => {
                   setIsDemoMode(true);
                   resetFlow();
                 }}
               >
                 <Sparkles size={16} />
-                Switch to Demo Simulation Mode & Run
+                Switch to Demo Simulation Mode
               </button>
-              {submitResult && (
-                <button className="btn btn-danger" onClick={handleReclaim} disabled={isBusy}>
-                  <RotateCcw size={16} />
-                  {isBusy ? "Reclaiming..." : "Reclaim Locked ETH (Sepolia)"}
-                </button>
-              )}
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowConfig(true)}
               >
                 <Settings size={16} />
                 Configure Contracts
-              </button>
-              <button className="btn btn-secondary" onClick={resetFlow}>
-                Restart Flow
               </button>
             </div>
           </div>
