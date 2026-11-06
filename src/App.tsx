@@ -820,6 +820,8 @@ export default function App() {
     setTimerRunning(false);
     startTimeRef.current = null;
     setActiveTxId(null);
+    setRouterAddress(DEFAULT_CONTRACTS.sepolia.realBridge);
+    setVerifierAddress(DEFAULT_CONTRACTS.amoy.realBridge);
   };
 
   const logoutWallet = () => {
@@ -1020,6 +1022,19 @@ export default function App() {
                 </button>
               </div>
 
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "5px 10px", fontSize: "11px" }}
+                onClick={() => {
+                  setRouterAddress(DEFAULT_CONTRACTS.sepolia.realBridge);
+                  setVerifierAddress(DEFAULT_CONTRACTS.amoy.realBridge);
+                  setWrappedDemoAddress(DEFAULT_CONTRACTS.amoy.wrappedDemo);
+                  setErrorMessage("");
+                }}
+              >
+                Reset to Defaults
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary"

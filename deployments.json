@@ -2,15 +2,15 @@
   "n1": {
     "network": "sepolia",
     "chainId": 11155111,
-    "router": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "router": "0xB59e7218d0FeF27dB36AE54Ef552174958d6355B",
     "deployedAt": "2026-10-25T08:44:57.000Z"
   },
   "n2": {
     "network": "amoy",
     "chainId": 80002,
-    "headerVerifier": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "headerVerifier": "0xbE4e93a52C221Af4C9770d81f5a08d224aE872Ad",
     "wrappedDemo": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "verifier": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "verifier": "0x17B6d8FC628BAa2646b10Bce715b3f636374AB51",
     "deployedAt": "2026-10-25T08:44:57.000Z"
   },
   "realBridgeN1": {
