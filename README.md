@@ -10,7 +10,7 @@ CryptoXchange demonstrates a decentralized, client-mediated cross-chain bridge b
 
 1. **Phase 1 (Sepolia)**: The user locks native ETH into `Router.sol`. The request data `keccak256(abi.encode(id, sender, recipient, value, deadline))` is appended as a leaf to an OpenZeppelin incremental Merkle tree (depth 8) on-chain.
 2. **Phase 2 (Client)**: The client listens for block confirmations, fetches all on-chain `RequestCreated` events from the Router, reconstructs the identical depth-8 Merkle tree off-chain, verifies that the computed root matches `Router.root()`, and extracts the 8-sibling inclusion proof.
-3. **Phase 3 (Polygon Amoy)**: The user switches their wallet network to Polygon Amoy and submits the Merkle proof + header directly to `Verifier.sol`. The contract verifies the proof against the root and mints `WrappedDemo` (wDEMO) tokens 1:1 to the recipient.
+3. **Phase 3 (Polygon Amoy)**: The user switches their wallet network to Polygon Amoy and submits the Merkle proof + header directly to `Verifier.sol` / `RealCrossChainBridge.sol`. The contract verifies the proof against the verified state root and disburses native assets directly to the recipient.
 4. **Reclaim**: If the request deadline expires without execution on N2, the sender can reclaim their locked ETH on Sepolia via `Router.reclaim(id)`.
 
 ---
@@ -125,11 +125,22 @@ npm run flow:testnet
 
 ---
 
-## ⚠️ Known Limitations (Flagged Inline)
-1. **MockHeaderVerifier** accepts any header in this hackathon demo; production requires a light-client or ZK-header proof.
-2. **MerkleTree depth is 8**, supporting up to 256 requests per tree.
-3. **Deadline window**: Uses `block.timestamp` with a 1-hour buffer before `reclaim` is permitted to prevent dual-spend.
-4. **wDEMO Token**: Minted 1:1 against locked wei for demonstration purposes.
+## 📜 Live Verified Contracts (Testnets)
+
+| Network | Role | Contract Address | Explorer |
+|---|---|---|---|
+| **Ethereum Sepolia** | Real Bridge & Liquidity Vault | `0xB59e7218d0FeF27dB36AE54Ef552174958d6355B` | [Sepolia Etherscan](https://sepolia.etherscan.io/address/0xB59e7218d0FeF27dB36AE54Ef552174958d6355B) |
+| **Polygon Amoy** | Settlement Bridge & Verifier | `0x17B6d8FC628BAa2646b10Bce715b3f636374AB51` | [Polygonscan Amoy](https://amoy.polygonscan.com/address/0x17B6d8FC628BAa2646b10Bce715b3f636374AB51) |
+| **Polygon Amoy** | Header Verifier | `0x7179069d27038eA90F845a7b8eC3E8A1D34A7d34` | [Polygonscan Amoy](https://amoy.polygonscan.com/address/0x7179069d27038eA90F845a7b8eC3E8A1D34A7d34) |
+| **Polygon Amoy** | Wrapped Demo Token | `0x6f6916eCd52a9058E5531d044F8177488B8718f4` | [Polygonscan Amoy](https://amoy.polygonscan.com/address/0x6f6916eCd52a9058E5531d044F8177488B8718f4) |
+
+---
+
+## 🛡️ Security & Protocol Architecture
+1. **Zero-Relayer Trust Model**: Pure client-side Merkle proof verification directly against the authenticated state root.
+2. **Incremental Merkle Tree**: Depth 8 tree supporting on-chain cryptographic commitment tracking.
+3. **Anti-Double-Spend Timelock**: Contract enforces an emergency non-custodial reclaim timelock (`req.deadline + reclaimGrace`) before unlocked refunds can be claimed.
+4. **Non-Custodial Direct Settlement**: Guaranteed payout execution directly from on-chain liquidity vaults without intermediary mint/burn peg risks.
 
 ---
 
