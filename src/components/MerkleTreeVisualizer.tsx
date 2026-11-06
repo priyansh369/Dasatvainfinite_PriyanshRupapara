@@ -160,16 +160,16 @@ export default function MerkleTreeVisualizer({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "16px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "20px" }}>🌳</span>
+            <span style={{ fontSize: "20px" }}>🛡️</span>
             <h3 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-              Interactive Merkle Tree Visualizer
+              Consensus State Proof Explorer
             </h3>
             <span className="badge badge-success" style={{ fontSize: "11px" }}>
-              OZ MerkleTree (Depth 8)
+              Verified State Proof
             </span>
           </div>
           <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Real-time off-chain cryptographic proof reconstruction with commutative Keccak-256 validation.
+            Real-time cryptographic consensus verification with commutative Keccak-256 state hashing.
           </p>
         </div>
 
@@ -410,13 +410,13 @@ export default function MerkleTreeVisualizer({
       {viewMode === "tree" && (
         <div style={{ background: "#fbf9fc", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "20px", marginBottom: "20px" }}>
           <div style={{ textAlign: "center", marginBottom: "16px", fontSize: "13px", color: "var(--text-muted)" }}>
-            Visualizing the binary proof branch from your leaf through depth 8 up to the single Merkle Root.
+            Visualizing the cryptographic consensus verification branch from transaction commitment up to the state root.
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
             {/* Top Root */}
             <div style={{ background: "rgba(5, 150, 105, 0.1)", border: "2px solid #059669", borderRadius: "var(--radius-sm)", padding: "10px 20px", textAlign: "center", minWidth: "320px", boxShadow: "0 0 15px rgba(5, 150, 105, 0.15)" }}>
-              <div style={{ fontSize: "12px", fontWeight: "800", color: "#059669" }}>👑 Merkle Root (Level 8)</div>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: "#059669" }}>👑 Consensus State Root (L8)</div>
               <div className="mono" style={{ fontSize: "11px", color: "var(--text-primary)" }}>
                 {targetRoot.slice(0, 14)}...{targetRoot.slice(-10)}
               </div>

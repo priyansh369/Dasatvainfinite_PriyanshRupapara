@@ -23,8 +23,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     symbol: "ETH",
     rpcUrls: [
       "https://ethereum-sepolia-rpc.publicnode.com",
-      "https://rpc.sepolia.org",
       "https://1rpc.io/sepolia",
+      "https://rpc.ankr.com/eth_sepolia",
     ],
     blockExplorerUrl: "https://sepolia.etherscan.io",
     color: "#d9633e", // Terracotta
@@ -38,7 +38,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     symbol: "POL",
     rpcUrls: [
       "https://polygon-amoy-bor-rpc.publicnode.com",
-      "https://rpc-amoy.polygon.technology",
+      "https://polygon-amoy.drpc.org",
+      "https://rpc.ankr.com/polygon_amoy",
     ],
     blockExplorerUrl: "https://amoy.polygonscan.com",
     color: "#af789b", // Dusty Mauve
