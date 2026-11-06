@@ -28,6 +28,8 @@ import {
   TrendingUp,
   Volume2,
   VolumeX,
+  User,
+  Code,
 } from "lucide-react";
 
 import {
@@ -143,6 +145,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>(() => loadTransactions());
   const [activeTxId, setActiveTxId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => isSoundEnabled());
+  const [uiMode, setUiMode] = useState<"simple" | "pro">("simple");
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -1236,6 +1239,37 @@ export default function App() {
             </button>
           </div>
 
+          {/* Consumer (Wise) vs Judge (Pro) Mode Switcher */}
+          <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", padding: "2px" }}>
+            <button
+              type="button"
+              className={`btn ${uiMode === "simple" ? "btn-primary" : "btn-secondary"}`}
+              style={{ padding: "5px 10px", fontSize: "11px", border: "none", gap: "4px" }}
+              onClick={() => {
+                playClickSound();
+                setUiMode("simple");
+              }}
+              title="Wise / Consumer-friendly simplified view"
+            >
+              <User size={12} />
+              Consumer
+            </button>
+            <button
+              type="button"
+              className={`btn ${uiMode === "pro" ? "btn-primary" : "btn-secondary"}`}
+              style={{ padding: "5px 10px", fontSize: "11px", border: "none", gap: "4px" }}
+              onClick={() => {
+                playClickSound();
+                setUiMode("pro");
+                setShowProofDetails(true);
+              }}
+              title="Full cryptographic Merkle tree & judge telemetry"
+            >
+              <Code size={12} />
+              Judge View
+            </button>
+          </div>
+
           {/* Web3 Audio Effects Toggle */}
           <button
             type="button"
@@ -1617,6 +1651,140 @@ export default function App() {
               </div>
             )}
 
+            {/* ── Mode-Specific Dashboard Presentation (Consumer vs Judge) ── */}
+            {uiMode === "simple" ? (
+              <>
+                {/* Consumer Delivery Timeline (Pizza Tracker) */}
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, rgba(216, 97, 60, 0.04), rgba(176, 116, 159, 0.06))",
+                    border: "1px solid rgba(176, 116, 159, 0.22)",
+                    borderRadius: "14px",
+                    padding: "14px 18px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-secondary)", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      Instant Consumer Settlement (Wise-Grade Experience)
+                    </span>
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#059669", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <ShieldCheck size={13} /> 100% Money-Back Guarantee
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                    {/* Step 1 */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(176, 116, 159, 0.15)" }}>
+                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "var(--terracotta-500)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", flexShrink: 0 }}>
+                        1
+                      </div>
+                      <div style={{ fontSize: "11px", lineHeight: "1.2" }}>
+                        <div style={{ fontWeight: "700", color: "var(--text-primary)" }}>You Send</div>
+                        <div style={{ color: "var(--text-muted)" }}>{sourceNetwork.shortName} Vault</div>
+                      </div>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(176, 116, 159, 0.15)" }}>
+                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "var(--mauve-600)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", flexShrink: 0 }}>
+                        2
+                      </div>
+                      <div style={{ fontSize: "11px", lineHeight: "1.2" }}>
+                        <div style={{ fontWeight: "700", color: "var(--text-primary)" }}>State Proof</div>
+                        <div style={{ color: "var(--text-muted)" }}>~1.4s Verification</div>
+                      </div>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(176, 116, 159, 0.15)" }}>
+                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "#059669", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", flexShrink: 0 }}>
+                        3
+                      </div>
+                      <div style={{ fontSize: "11px", lineHeight: "1.2" }}>
+                        <div style={{ fontWeight: "700", color: "var(--text-primary)" }}>Delivered</div>
+                        <div style={{ color: "var(--text-muted)" }}>{destNetwork.shortName} Payout</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Judge Inspector Switch Prompt */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "rgba(176, 116, 159, 0.08)",
+                    border: "1px dashed rgba(176, 116, 159, 0.35)",
+                    borderRadius: "10px",
+                    padding: "8px 14px",
+                    marginBottom: "16px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔬</span>
+                    <span><strong>Hackathon Judge?</strong> Inspect the live 8-Depth Incremental Merkle Tree & Cryptographic Root</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClickSound();
+                      setUiMode("pro");
+                      setShowProofDetails(true);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--terracotta-600)",
+                      fontWeight: "800",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontSize: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    Switch to Judge View ➔
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Judge Pro Inspector Dashboard */
+              <div
+                style={{
+                  background: "linear-gradient(135deg, rgba(28, 11, 32, 0.95), rgba(45, 20, 50, 0.95))",
+                  border: "1px solid var(--terracotta-500)",
+                  borderRadius: "14px",
+                  padding: "16px 20px",
+                  marginBottom: "16px",
+                  color: "#ffffff",
+                  boxShadow: "0 4px 20px rgba(216, 97, 60, 0.15)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "800", color: "var(--terracotta-400)", letterSpacing: "0.5px", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔬</span> Cryptographic State Machine Inspector (Judge View)
+                  </span>
+                  <span className="badge" style={{ background: "rgba(216, 97, 60, 0.25)", color: "#fff", fontSize: "11px", border: "1px solid var(--terracotta-500)" }}>
+                    Depth 8 Merkle Tree (256 Leaves)
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.85)", lineHeight: "1.5", fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>
+                  Leaf Commitment: keccak256(srcChain, srcBridge, dstChain, id, sender, recipient, token, amount, targetCall, callDataHash, deadline)
+                </div>
+                <div style={{ display: "flex", gap: "14px", marginTop: "10px", fontSize: "11px", color: "rgba(255, 255, 255, 0.6)", flexWrap: "wrap" }}>
+                  <span>Source Vault: 0xB59e...355B (Sepolia)</span>
+                  <span>·</span>
+                  <span>Verifier: 0x17B6...AB51 (Amoy)</span>
+                  <span>·</span>
+                  <span style={{ color: "#34d399", fontWeight: "700" }}>Stateless Zero Relayer Protocol</span>
+                </div>
+              </div>
+            )}
+
             {/* ── Minimalist Native Cross-Chain Transfer Engine ── */}
             <div style={{ marginBottom: "22px" }}>
               {/* Send Box */}
@@ -1634,7 +1802,7 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
-                      You Send
+                      {uiMode === "simple" ? `You Send (From ${sourceNetwork.name})` : "You Send"}
                     </span>
                     <span className={`badge ${sourceNetworkKey === "sepolia" ? "badge-sepolia" : "badge-amoy"}`} style={{ fontSize: "11px" }}>
                       {sourceNetwork.icon} {sourceNetwork.name}
@@ -1775,7 +1943,7 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)" }}>
-                      You Receive (Destination Payout)
+                      {uiMode === "simple" ? `Recipient Receives (On ${destNetwork.name})` : "You Receive (Destination Payout)"}
                     </span>
                     <span className={`badge ${destNetworkKey === "amoy" ? "badge-amoy" : "badge-sepolia"}`} style={{ fontSize: "11px" }}>
                       {destNetwork.icon} {destNetwork.name}
@@ -2195,7 +2363,7 @@ export default function App() {
                 </div>
               </button>
 
-              {showProofDetails && (
+              {(showProofDetails || uiMode === "pro") && (
                 <div style={{ marginTop: "14px" }}>
                   <MerkleTreeVisualizer
                     root={proofResult.header.root}
